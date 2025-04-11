@@ -2,8 +2,8 @@
 #include "shell_port.h"
 #include "stdio.h"
 
-char rttLogWriteBuffer[5120];
-char rttLogReadBuffer[5120];
+char rttLogWriteBuffer[512];
+char rttLogReadBuffer[512];
 
 ADS1220_regs ADS1220_default_regs = {
     .cfg_reg0 = ADS1220_PGA_GAIN_1,         // 1x增益
