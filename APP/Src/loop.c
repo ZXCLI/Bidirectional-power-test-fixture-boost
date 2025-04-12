@@ -4,6 +4,7 @@
 
 char rttLogWriteBuffer[512];
 char rttLogReadBuffer[512];
+uint32_t adc_value[4];
 
 ADS1220_regs ADS1220_default_regs = {
     .cfg_reg0 = ADS1220_PGA_GAIN_1,         // 1x增益
@@ -27,12 +28,11 @@ void MY_Init(void)
     HAL_GPIO_WritePin(DAC_CS_GPIO_Port, DAC_CS_Pin, GPIO_PIN_SET);      // DAC片选上拉
 
     ADS1220_init(&hspi2, &ADS1220_default_regs);
-    ADS1220_select_mux_config(&hspi2, ADS1220_MUX_AIN2_AVSS, &ADS1220_default_regs);
 
     rttShellInit(); // 初始化RTT Shell
 
-    DAC8552_WriteA(&hspi1, 0.51724f);
-    DAC8552_WriteB(&hspi1, 0.51724f);
+    SetVoltageOrCurrent(VOLTAGE,14.0f); // 设置输出电压
+    SetVoltageOrCurrent(CURRENT,40.0f); // 设置输入电流
 
     HAL_Delay(100);
 
@@ -46,12 +46,17 @@ void MY_Init(void)
 
 void MY_Loop(void)
 {
-    HAL_Delay(100);
+    HAL_Delay(500);
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
-    int32_t adc_value = ADS1220_read_singleshot(&hspi2, ADC_DRDY_GPIO_Port, ADC_DRDY_Pin, 100);
+    for(uint8_t i = 0; i < 4; i++)
+    {
+        adc_value[i] = ADS1220_read_singleshot_channel(&hspi2, (ADS1220_MUX_AIN0_AVSS + (16 * i)), 
+                                                       &ADS1220_default_regs,
+                                                       ADC_DRDY_GPIO_Port, ADC_DRDY_Pin, 100);
+    }
     
-    SEGGER_RTT_printf(1, "adc_value = %d\n\r", (int)(100000.0f*DAC8552_Vref*(float)(adc_value)/(float)(1<<23)));
+    SEGGER_RTT_printf(1, "adc_value = %d\n\r", (int)(100000.0f*DAC8552_Vref*(float)(adc_value[V_OUT])/(float)(1<<23)));
 }
 
 void UVLO_ALL_Close()
@@ -93,4 +98,18 @@ void fanPWMInit()
     TIM15->CCR1 = 0;
     LL_TIM_EnableCounter(TIM15);
     LL_TIM_EnableIT_UPDATE(TIM15);//使能TIM15的更新中断，在终端里面运行终端
+}
+
+void SetVoltageOrCurrent(DAC_CHANNELS channel,float value)
+{
+    if(channel == VOLTAGE)
+    {
+        float voltage = value*0.034275f + 0.000393f;
+        DAC8552_WriteA(&hspi1, voltage); // 设置输出电压
+    }
+    else if(channel == CURRENT)
+    {
+        float current = value*0.018614f + 0.131894;
+        DAC8552_WriteB(&hspi1, current); // 设置输入电流
+    }
 }
