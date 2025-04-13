@@ -32,7 +32,7 @@ void MY_Init(void)
     rttShellInit(); // 初始化RTT Shell
 
     SetVoltageOrCurrent(VOLTAGE,14.0f); // 设置输出电压
-    SetVoltageOrCurrent(CURRENT,40.0f); // 设置输入电流
+    SetVoltageOrCurrent(CURRENT,4.0f); // 设置输入电流
 
     HAL_Delay(100);
 

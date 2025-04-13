@@ -162,5 +162,22 @@ void setOutputVoltage(float voltage)
 
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
-    SetOutputVoltage, setOutputVoltage, "SetOutputVoltage"
+    setOutputVoltage, setOutputVoltage, "SetOutputVoltage"
+);
+
+
+void setOutputCurrent(float current)
+{
+    if(current < 0.5f)
+    {
+        return;
+    }else
+    {
+        SetVoltageOrCurrent(CURRENT, current);
+    }
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    setOutputCurrent, setOutputCurrent, "SetOutputCurrent"
 );
