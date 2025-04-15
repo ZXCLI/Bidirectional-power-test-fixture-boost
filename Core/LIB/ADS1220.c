@@ -64,6 +64,14 @@ void ADS1220_disable_PGA(SPI_HandleTypeDef *hspi, ADS1220_regs *r)
 	ADS1220_writeRegister(hspi, ADS1220_CONFIG_REG0_ADDRESS, r->cfg_reg0);
 }
 
+void ADS1220_set_mode(SPI_HandleTypeDef *hspi, int mode, ADS1220_regs *r)
+{
+    r->cfg_reg1 &= ~_BV(3);
+    r->cfg_reg1 &= ~_BV(4);//清空第3位和第4位
+    r->cfg_reg1 |= (mode<<3);
+    ADS1220_writeRegister(hspi, ADS1220_CONFIG_REG1_ADDRESS, r->cfg_reg1);
+}
+
 void ADS1220_set_conv_mode_continuous(SPI_HandleTypeDef *hspi, ADS1220_regs *r)
 {
 	r->cfg_reg1 |= _BV(2);

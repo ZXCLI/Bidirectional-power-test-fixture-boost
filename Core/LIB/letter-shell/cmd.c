@@ -35,10 +35,10 @@ int16_t SetClockPhases(uint8_t phases)
     uint8_t six_phase[6] = {1,24+1,48+1,72+1,96+1,1};   //六相全部工作
     uint8_t three_phase[3] = {1,60+1,1};                //三相只有1，3，6工作
 
-    static uint8_t last_phases = 6;
+    static uint8_t last_phases = 0;
     if (phases != last_phases)
     {
-        if((phases != 1) && (phases != 2) && (phases != 3) && (phases != 6)){
+        if((phases != 0) && (phases != 1) && (phases != 2) && (phases != 3) && (phases != 6)){
             return -1;
         }    
         switch(last_phases | (phases << 3)){
@@ -73,6 +73,20 @@ int16_t SetClockPhases(uint8_t phases)
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
                 break;
+            case (6|(0<<3))://六相转零相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO2_GPIO_Port,UVLO2_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO3_GPIO_Port,UVLO3_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO4_GPIO_Port,UVLO4_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO5_GPIO_Port,UVLO5_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,StandBy);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH2);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH3);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH4);
+                LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH1);
+                LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                break;
             case (3|(6<<3))://三相转六相
                 HAL_GPIO_WritePin(UVLO2_GPIO_Port,UVLO2_Pin,RunNormal);
                 HAL_GPIO_WritePin(UVLO4_GPIO_Port,UVLO4_Pin,RunNormal);
@@ -89,6 +103,14 @@ int16_t SetClockPhases(uint8_t phases)
             case (3|(1<<3))://三相转一相
                 HAL_GPIO_WritePin(UVLO3_GPIO_Port,UVLO3_Pin,StandBy);
                 HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,StandBy);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH3);
+                LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                break;
+            case (3|(0<<3))://三相转零相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO3_GPIO_Port,UVLO3_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,StandBy);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH3);
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
                 break;
@@ -110,6 +132,12 @@ int16_t SetClockPhases(uint8_t phases)
                 break;
             case (2|(1<<3))://两相转一相
                 HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,StandBy);
+                LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                break;
+            case (2|(0<<3))://两相转零相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,StandBy);
+                HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,StandBy);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
                 break;
             case (1|(6<<3))://一相转六相
@@ -135,6 +163,44 @@ int16_t SetClockPhases(uint8_t phases)
             case (1|(2<<3))://一相转两相
                 HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,RunNormal);
                 LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                break;
+            case (1|(0<<3))://一相转零相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,StandBy);
+                LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+                break;
+            case (0|(6<<3))://零相转六相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO2_GPIO_Port,UVLO2_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO3_GPIO_Port,UVLO3_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO4_GPIO_Port,UVLO4_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO5_GPIO_Port,UVLO5_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,RunNormal);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH2);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH3);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH4);
+                LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH1);
+                LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                TIM1->CCR3 = six_phase[2];
+                break;
+            case (0|(3<<3))://零相转三相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO3_GPIO_Port,UVLO3_Pin,RunNormal);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH3);
+                LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                TIM1->CCR3 = three_phase[1];
+                break;
+            case (0|(2<<3))://零相转两相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
+                HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,RunNormal);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+                LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                break;
+            case (0|(0<<3))://零相转一相
+                HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
+                LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 break;
             default:
                 break;

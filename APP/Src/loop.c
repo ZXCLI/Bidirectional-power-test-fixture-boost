@@ -4,11 +4,11 @@
 
 char rttLogWriteBuffer[512];
 char rttLogReadBuffer[512];
-uint32_t adc_value[4];
+__IO uint32_t adc_value[4];
 
 ADS1220_regs ADS1220_default_regs = {
     .cfg_reg0 = ADS1220_PGA_GAIN_1,         // 1x增益
-    .cfg_reg1 = ADS1220_DR_20SPS | _BV(2),  // 采样率20 SPS
+    .cfg_reg1 = ADS1220_DR_45SPS | _BV(2),  // 采样率20 SPS，连续模式
     .cfg_reg2 = (0x01 << 6) | (0x01 << 4),  // 外部参考电压，FIR为50Hz
     .cfg_reg3 = 0x00                        // 关闭IDAC
 };
@@ -23,11 +23,14 @@ void MY_Init(void)
     UVLO_ALL_Close();
     boostClockInit();
     fanPWMInit();
+    SetClockPhases(0);
 
     HAL_GPIO_WritePin(ADC_CS_GPIO_Port, ADC_CS_Pin, GPIO_PIN_RESET);    // ADC片选直接下拉
     HAL_GPIO_WritePin(DAC_CS_GPIO_Port, DAC_CS_Pin, GPIO_PIN_SET);      // DAC片选上拉
 
     ADS1220_init(&hspi2, &ADS1220_default_regs);
+    ADS1220_set_conv_mode_continuous(&hspi2, &ADS1220_default_regs);
+    ADS1220_set_mode(&hspi2, ADS1220_MODE_Trubo, &ADS1220_default_regs);
 
     rttShellInit(); // 初始化RTT Shell
 
@@ -36,17 +39,10 @@ void MY_Init(void)
 
     HAL_Delay(100);
 
-    HAL_GPIO_WritePin(UVLO1_GPIO_Port, UVLO1_Pin, RunNormal);
-    HAL_GPIO_WritePin(UVLO2_GPIO_Port, UVLO2_Pin, RunNormal);
-    HAL_GPIO_WritePin(UVLO3_GPIO_Port, UVLO3_Pin, RunNormal);
-    HAL_GPIO_WritePin(UVLO4_GPIO_Port, UVLO4_Pin, RunNormal);
-    HAL_GPIO_WritePin(UVLO5_GPIO_Port, UVLO5_Pin, RunNormal);
-    HAL_GPIO_WritePin(UVLO6_GPIO_Port, UVLO6_Pin, RunNormal);
 }
 
 void MY_Loop(void)
 {
-    HAL_Delay(500);
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
     for(uint8_t i = 0; i < 4; i++)
@@ -54,9 +50,11 @@ void MY_Loop(void)
         adc_value[i] = ADS1220_read_singleshot_channel(&hspi2, (ADS1220_MUX_AIN0_AVSS + (16 * i)), 
                                                        &ADS1220_default_regs,
                                                        ADC_DRDY_GPIO_Port, ADC_DRDY_Pin, 100);
+        HAL_Delay(80);
     }
     
-    SEGGER_RTT_printf(1, "adc_value = %d\n\r", (int)(100000.0f*DAC8552_Vref*(float)(adc_value[V_OUT])/(float)(1<<23)));
+    //SEGGER_RTT_printf(1, "adc_value = %d\n\r", (int)(100000.0f*DAC8552_Vref*(float)(adc_value[I_IN])/(float)(1<<23)));
+    SEGGER_RTT_printf(1,"%d,%d,%d,%d\n\r",adc_value[V_IN], adc_value[V_OUT], adc_value[I_IN], adc_value[I_OUT]);
 }
 
 void UVLO_ALL_Close()

@@ -94,6 +94,11 @@
 #define ADS1220_REG_CONFIG0_PGA_GAIN_MASK 0x0E
 #define ADS1220_REG_CONFIG0_MUX_MASK      0xF0
 
+// Mode
+#define ADS1220_MODE_NORMAL     0x00
+#define ADS1220_MODE_Duty_cycle 0x01
+#define ADS1220_MODE_Trubo      0x02
+
 // Data Rates
 #define ADS1220_DR_20SPS   0x00
 #define ADS1220_DR_45SPS   0x20
@@ -157,5 +162,6 @@ uint8_t* ADS1220_get_config(SPI_HandleTypeDef *hspi, ADS1220_regs *r);
 int32_t ADS1220_read_blocking(SPI_HandleTypeDef *hspi, GPIO_TypeDef *DRDY_PORT, uint16_t DRDY_PIN, uint16_t timeout);
 int32_t ADS1220_read_singleshot(SPI_HandleTypeDef *hspi, GPIO_TypeDef *DRDY_PORT, uint16_t DRDY_PIN, uint16_t timeout);
 int32_t ADS1220_read_singleshot_channel(SPI_HandleTypeDef *hspi, uint8_t channel_num, ADS1220_regs *r, GPIO_TypeDef *DRDY_PORT, uint16_t DRDY_PIN, uint16_t timeout);
+void ADS1220_set_mode(SPI_HandleTypeDef *hspi, int mode, ADS1220_regs *r);
 
 #endif /* INC_ADS1220_H_ */

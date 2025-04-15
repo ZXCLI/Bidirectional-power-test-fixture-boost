@@ -203,10 +203,6 @@ void TIM15_IRQHandler(void)
       for(uint16_t i = 0; i < len; i++)
       {
         shellHandler(&rttShell,data[i]);
-        // if(data[i] != '\r'){
-        //     //rttShell.write(&data[i],1);
-        //     //SEGGER_RTT_Write(0, &data[i], 1);
-        // }
         data[i] = 0;
       }
   }
