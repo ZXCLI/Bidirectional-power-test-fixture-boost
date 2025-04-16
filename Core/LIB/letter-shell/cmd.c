@@ -215,6 +215,7 @@ SHELL_EXPORT_CMD(
     setClockPhases, SetClockPhases, "SetClockPhases 1,2,3 or 6"
 );
 
+// 直接设置输出电压和电流
 void SetVoltageOrCurrent(DAC_CHANNELS channel, float value)
 {
     if (channel == VOLTAGE) {
@@ -226,6 +227,7 @@ void SetVoltageOrCurrent(DAC_CHANNELS channel, float value)
     }
 }
 
+// 间接设置输出电压，带斜坡
 void setOutputVoltage(float voltage)
 {
     if(voltage < 12.0f)
@@ -233,7 +235,7 @@ void setOutputVoltage(float voltage)
         return;
     }else
     {
-        SetVoltageOrCurrent(VOLTAGE, voltage);
+        device.DAC_voltage_ref = voltage;
     }
 }
 
@@ -242,7 +244,7 @@ SHELL_EXPORT_CMD(
     setOutputVoltage, setOutputVoltage, "SetOutputVoltage"
 );
 
-
+// 间接设置输入电流，带斜坡
 void setIutputCurrent(float current)
 {
     if(current < 0.5f)
@@ -250,7 +252,7 @@ void setIutputCurrent(float current)
         return;
     }else
     {
-        SetVoltageOrCurrent(CURRENT, current);
+        device.DAC_current_ref = current;
     }
 }
 

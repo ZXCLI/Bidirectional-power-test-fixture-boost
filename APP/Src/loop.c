@@ -3,9 +3,10 @@
 #include "stdio.h"
 #include "cmd.h"
 
+Device device;
+
 char rttLogWriteBuffer[512];
 char rttLogReadBuffer[512];
-__IO uint32_t adc_value[4];
 
 void (*Alpha_State_Ptr)(void); // 基态状态机指针
 void (*A_Task_Ptr)(void);      // A分支任务指针
@@ -28,7 +29,7 @@ void MY_Init(void)
     SEGGER_RTT_ConfigDownBuffer(1, "Log", rttLogReadBuffer, 512, SEGGER_RTT_MODE_NO_BLOCK_SKIP); // 配置读缓冲
 
     UVLO_ALL_Close();       // 关闭所有模块
-    boostClockInit();       // 初始化时钟
+    moduleClockInit();      // 初始化时钟
     fanPWMInit();           // 初始化风扇PWM
     SetClockPhases(0);      // 设置相数
 
@@ -41,8 +42,10 @@ void MY_Init(void)
 
     rttShellInit(); // 初始化RTT Shell
 
-    SetVoltageOrCurrent(VOLTAGE,14.0f); // 设置输出电压
-    SetVoltageOrCurrent(CURRENT,4.0f); // 设置输入电流
+    SetVoltageOrCurrent(VOLTAGE,14.0f); // 直接设置输出电压
+    SetVoltageOrCurrent(CURRENT,0.1f);  // 直接设置输入电流
+    device.DAC_voltage_ref = 15.0f;
+    device.DAC_voltage_ref = 0.6f;
 
     HAL_Delay(100);
 
@@ -67,7 +70,7 @@ void UVLO_ALL_Close()
     HAL_GPIO_WritePin(UVLO6_GPIO_Port, UVLO6_Pin, StandBy);
 }
 
-void boostClockInit()
+void moduleClockInit()
 {
     LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH1); // 使能TIM3_CH1
     LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2); // 使能TIM3_CH2
@@ -96,6 +99,35 @@ void fanPWMInit()
     TIM15->CCR1 = 0;
     LL_TIM_EnableCounter(TIM15);
     LL_TIM_EnableIT_UPDATE(TIM15);//使能TIM15的更新中断，在终端里面运行终端
+}
+
+float Slew_Func(float *slewVal, float refVal, float slewRate)
+{
+    static float diff = 0;
+    diff = refVal - *slewVal;
+    if (diff >= slewRate) {
+        *slewVal += slewRate;
+        return (1);
+    } else if (-diff >= slewRate) {
+        *slewVal -= slewRate;
+        return (-1);
+    } else {
+        *slewVal = refVal;
+        return (0);
+    }
+}
+
+// 通过斜坡函数更新DAC输出
+void updateDAC()
+{
+    if(Slew_Func(&device.DAC_voltage_now, device.DAC_voltage_ref, 0.1f) != 0)
+    {
+        SetVoltageOrCurrent(VOLTAGE,device.DAC_voltage_now);
+    }
+    if(Slew_Func(&device.DAC_current_now, device.DAC_current_ref, 0.1f) != 0)
+    {
+        SetVoltageOrCurrent(CURRENT,device.DAC_current_now);
+    }
 }
 
 void A0(void)
@@ -133,12 +165,25 @@ void A1(void)
 void A2(void)
 {
     // A分支任务2，读取ADC数据
-    
+    static uint8_t ADC_CHANNEL = 0;
+    device.adc_value[ADC_CHANNEL] = ADS1220_read_singleshot_channel(&hspi2, 
+                                                                    ADS1220_MUX_AIN0_AVSS + ADC_CHANNEL * 16
+                                                                    , &ADS1220_default_regs,
+                                                                    ADC_DRDY_GPIO_Port, ADC_DRDY_Pin, 100);
+    ADC_CHANNEL++;
+    if(ADC_CHANNEL == 4){
+        ADC_CHANNEL = 0;
+    }
+    SEGGER_RTT_printf(1,"%d,%d,%d,%d\n\r",device.adc_value[V_IN],
+                                          device.adc_value[V_OUT],
+                                          device.adc_value[I_IN],
+                                          device.adc_value[I_OUT]);
     A_Task_Ptr = &A1;
 }
 
 void B1(void)
 {
-    // B分支任务
+    // B分支任务1，使用斜坡函数更新DAC输出
+    updateDAC();
     B_Task_Ptr = &B1;
 }

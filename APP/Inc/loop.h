@@ -28,6 +28,22 @@ typedef enum
     CURRENT
 }DAC_CHANNELS;
 
+typedef struct
+{
+    float V_IN;
+    float V_OUT;
+    float I_IN;
+    float I_OUT;
+    float DAC_voltage_ref;
+    float DAC_current_ref;
+    float DAC_voltage_now;
+    float DAC_current_now;
+    uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
+    uint16_t system_status;
+}Device;
+
+extern Device device;
+
 extern bool A_Task_Flag; // A分支任务标志
 extern bool B_Task_Flag; // B分支任务标志
 
@@ -35,8 +51,10 @@ void MY_Init();
 void MY_Loop();
 
 void UVLO_ALL_Close();
-void boostClockInit();
+void moduleClockInit();
 void fanPWMInit();
+float Slew_Func(float *slewVal, float refVal, float slewRate);
+void updateDAC();
 
 void A0(void);
 void A1(void);

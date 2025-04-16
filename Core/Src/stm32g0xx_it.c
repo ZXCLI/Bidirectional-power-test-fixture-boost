@@ -196,8 +196,9 @@ void TIM15_IRQHandler(void)
   /* USER CODE BEGIN TIM15_IRQn 0 */
   if (LL_TIM_IsActiveFlag_UPDATE(TIM15)) {
       LL_TIM_ClearFlag_UPDATE(TIM15);
-
-
+    
+      A_Task_Flag = 1;
+      B_Task_Flag = 1;
   }
   /* USER CODE END TIM15_IRQn 0 */
   /* USER CODE BEGIN TIM15_IRQn 1 */
