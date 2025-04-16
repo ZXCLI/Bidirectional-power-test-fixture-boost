@@ -1,10 +1,17 @@
 #include "loop.h"
 #include "shell_port.h"
 #include "stdio.h"
+#include "cmd.h"
 
 char rttLogWriteBuffer[512];
 char rttLogReadBuffer[512];
 __IO uint32_t adc_value[4];
+
+void (*Alpha_State_Ptr)(void); // 基态状态机指针
+void (*A_Task_Ptr)(void);      // A分支任务指针
+void (*B_Task_Ptr)(void);      // B分支任务指针
+bool A_Task_Flag = false;      // A分支任务标志
+bool B_Task_Flag = false;      // B分支任务标志
 
 ADS1220_regs ADS1220_default_regs = {
     .cfg_reg0 = ADS1220_PGA_GAIN_1,         // 1x增益
@@ -20,10 +27,10 @@ void MY_Init(void)
     SEGGER_RTT_ConfigUpBuffer(1, "Log", rttLogWriteBuffer, 512, SEGGER_RTT_MODE_NO_BLOCK_SKIP); // 配置写缓冲
     SEGGER_RTT_ConfigDownBuffer(1, "Log", rttLogReadBuffer, 512, SEGGER_RTT_MODE_NO_BLOCK_SKIP); // 配置读缓冲
 
-    UVLO_ALL_Close();
-    boostClockInit();
-    fanPWMInit();
-    SetClockPhases(0);
+    UVLO_ALL_Close();       // 关闭所有模块
+    boostClockInit();       // 初始化时钟
+    fanPWMInit();           // 初始化风扇PWM
+    SetClockPhases(0);      // 设置相数
 
     HAL_GPIO_WritePin(ADC_CS_GPIO_Port, ADC_CS_Pin, GPIO_PIN_RESET);    // ADC片选直接下拉
     HAL_GPIO_WritePin(DAC_CS_GPIO_Port, DAC_CS_Pin, GPIO_PIN_SET);      // DAC片选上拉
@@ -39,22 +46,15 @@ void MY_Init(void)
 
     HAL_Delay(100);
 
+    Alpha_State_Ptr = &A0; // 初始化状态机
+    A_Task_Ptr = &A1;
+    B_Task_Ptr = &B1;
+
 }
 
 void MY_Loop(void)
 {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-
-    for(uint8_t i = 0; i < 4; i++)
-    {
-        adc_value[i] = ADS1220_read_singleshot_channel(&hspi2, (ADS1220_MUX_AIN0_AVSS + (16 * i)), 
-                                                       &ADS1220_default_regs,
-                                                       ADC_DRDY_GPIO_Port, ADC_DRDY_Pin, 100);
-        HAL_Delay(80);
-    }
-    
-    //SEGGER_RTT_printf(1, "adc_value = %d\n\r", (int)(100000.0f*DAC8552_Vref*(float)(adc_value[I_IN])/(float)(1<<23)));
-    SEGGER_RTT_printf(1,"%d,%d,%d,%d\n\r",adc_value[V_IN], adc_value[V_OUT], adc_value[I_IN], adc_value[I_OUT]);
+    (*Alpha_State_Ptr)(); // 调用状态机
 }
 
 void UVLO_ALL_Close()
@@ -98,16 +98,47 @@ void fanPWMInit()
     LL_TIM_EnableIT_UPDATE(TIM15);//使能TIM15的更新中断，在终端里面运行终端
 }
 
-void SetVoltageOrCurrent(DAC_CHANNELS channel,float value)
+void A0(void)
 {
-    if(channel == VOLTAGE)
-    {
-        float voltage = value*0.034275f + 0.000393f;
-        DAC8552_WriteA(&hspi1, voltage); // 设置输出电压
+    if(A_Task_Flag)
+    {   A_Task_Flag = false;
+        (*A_Task_Ptr)();    // 执行A分支任务
     }
-    else if(channel == CURRENT)
-    {
-        float current = value*0.018614f + 0.131894;
-        DAC8552_WriteB(&hspi1, current); // 设置输入电流
+    Alpha_State_Ptr = &B0;  // 转换到B分支
+}
+
+void B0(void)
+{
+    if(B_Task_Flag)
+    {   B_Task_Flag = false;
+        (*B_Task_Ptr)();    // 执行B分支任务
     }
+    Alpha_State_Ptr = &A0;  // 转换到A分支
+}
+
+void A1(void)
+{
+    // A分支任务1，读取RTT输入，运行Shell
+    char data[128] = {0};
+    uint16_t len = 0;
+    len = rttShellRead(data, 128);
+
+    for (uint16_t i = 0; i < len; i++) {
+        shellHandler(&rttShell, data[i]);
+    }
+
+    A_Task_Ptr = &A2;
+}
+
+void A2(void)
+{
+    // A分支任务2，读取ADC数据
+    
+    A_Task_Ptr = &A1;
+}
+
+void B1(void)
+{
+    // B分支任务
+    B_Task_Ptr = &B1;
 }

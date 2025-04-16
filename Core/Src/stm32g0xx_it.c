@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "shell_port.h"
+#include "loop.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -195,16 +196,8 @@ void TIM15_IRQHandler(void)
   /* USER CODE BEGIN TIM15_IRQn 0 */
   if (LL_TIM_IsActiveFlag_UPDATE(TIM15)) {
       LL_TIM_ClearFlag_UPDATE(TIM15);
-      
-      char data[512] = {0};
-      uint16_t len = 0;
-      len = rttShellRead(data, 512);
 
-      for(uint16_t i = 0; i < len; i++)
-      {
-        shellHandler(&rttShell,data[i]);
-        data[i] = 0;
-      }
+
   }
   /* USER CODE END TIM15_IRQn 0 */
   /* USER CODE BEGIN TIM15_IRQn 1 */

@@ -215,6 +215,17 @@ SHELL_EXPORT_CMD(
     setClockPhases, SetClockPhases, "SetClockPhases 1,2,3 or 6"
 );
 
+void SetVoltageOrCurrent(DAC_CHANNELS channel, float value)
+{
+    if (channel == VOLTAGE) {
+        float voltage = value * 0.034275f + 0.000393f;
+        DAC8552_WriteA(&hspi1, voltage); // 设置输出电压
+    } else if (channel == CURRENT) {
+        float current = value * 0.018614f + 0.131894;
+        DAC8552_WriteB(&hspi1, current); // 设置输入电流
+    }
+}
+
 void setOutputVoltage(float voltage)
 {
     if(voltage < 12.0f)
@@ -232,7 +243,7 @@ SHELL_EXPORT_CMD(
 );
 
 
-void setOutputCurrent(float current)
+void setIutputCurrent(float current)
 {
     if(current < 0.5f)
     {
@@ -245,5 +256,5 @@ void setOutputCurrent(float current)
 
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
-    setOutputCurrent, setOutputCurrent, "SetOutputCurrent"
+    setIutputCurrent, setIutputCurrent, "SetOutputCurrent"
 );
