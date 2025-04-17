@@ -173,14 +173,14 @@ void A1(void)
 
 void A2(void)
 {
-    // A分支任务2，读取ADC数据
+    // A分支任务2，使用斜坡函数更新DAC输出
     updateDAC();
     A_Task_Ptr = &A1;
 }
 
 void B1(void)
 {
-    // B分支任务1，使用斜坡函数更新DAC输出
+    // B分支任务1，读取ADC数据
 
     static uint8_t ADC_CHANNEL = 0; // 使用O1和Og优化时，这里在读取ADC数据的时候会跑飞，很奇怪  
     
