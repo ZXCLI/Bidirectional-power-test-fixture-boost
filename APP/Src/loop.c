@@ -15,8 +15,8 @@ bool A_Task_Flag = false;      // A分支任务标志
 bool B_Task_Flag = false;      // B分支任务标志
 
 ADS1220_regs ADS1220_default_regs = {
-    .cfg_reg0 = ADS1220_PGA_GAIN_1,         // 1x增益
-    .cfg_reg1 = ADS1220_DR_45SPS | _BV(2),  // 采样率20 SPS，连续模式
+    .cfg_reg0 = 0x00,                       // 关闭PGA
+    .cfg_reg1 = ADS1220_DR_90SPS | _BV(2),  // 采样率20 SPS，连续模式
     .cfg_reg2 = (0x01 << 6) | (0x01 << 4),  // 外部参考电压，FIR为50Hz
     .cfg_reg3 = 0x00                        // 关闭IDAC
 };
@@ -95,10 +95,12 @@ void moduleClockInit()
 
 void fanPWMInit()
 {
-    LL_TIM_CC_EnableChannel(TIM15, LL_TIM_CHANNEL_CH1); // 使能TIM15_CH1
-    TIM15->CCR1 = 0;
+    LL_TIM_CC_EnableChannel(TIM15, LL_TIM_CHANNEL_CH2); // 使能TIM15_CH2，500Hz
+    //TIM15->CCR1 = 0;
     LL_TIM_EnableCounter(TIM15);
     LL_TIM_EnableIT_UPDATE(TIM15);//使能TIM15的更新中断，在终端里面运行终端
+    LL_TIM_EnableAllOutputs(TIM15);
+    //TIM15->CCR2 = 300;
 }
 
 float Slew_Func(float *slewVal, float refVal, float slewRate)
@@ -130,7 +132,7 @@ void updateDAC()
     }
 }
 
-void A0(void)
+void A0(void)       // A分支1KHz
 {
     if(A_Task_Flag)
     {   A_Task_Flag = false;
@@ -139,7 +141,7 @@ void A0(void)
     Alpha_State_Ptr = &B0;  // 转换到B分支
 }
 
-void B0(void)
+void B0(void)       // B分支66Hz
 {
     if(B_Task_Flag)
     {   B_Task_Flag = false;
@@ -165,25 +167,28 @@ void A1(void)
 void A2(void)
 {
     // A分支任务2，读取ADC数据
-    static uint8_t ADC_CHANNEL = 0;
-    device.adc_value[ADC_CHANNEL] = ADS1220_read_singleshot_channel(&hspi2, 
-                                                                    ADS1220_MUX_AIN0_AVSS + ADC_CHANNEL * 16
-                                                                    , &ADS1220_default_regs,
-                                                                    ADC_DRDY_GPIO_Port, ADC_DRDY_Pin, 100);
-    ADC_CHANNEL++;
-    if(ADC_CHANNEL == 4){
-        ADC_CHANNEL = 0;
-    }
-    SEGGER_RTT_printf(1,"%d,%d,%d,%d\n\r",device.adc_value[V_IN],
-                                          device.adc_value[V_OUT],
-                                          device.adc_value[I_IN],
-                                          device.adc_value[I_OUT]);
+    updateDAC();
     A_Task_Ptr = &A1;
 }
 
 void B1(void)
 {
     // B分支任务1，使用斜坡函数更新DAC输出
-    updateDAC();
+    HAL_GPIO_TogglePin(TEST1_GPIO_Port, TEST1_Pin);
+
+    static uint8_t ADC_CHANNEL = 0; // 使用O1和Og优化时，这里在读取ADC数据的时候会跑飞，很奇怪
+    device.adc_value[ADC_CHANNEL] = ADS1220_read_singleshot_channel(&hspi2,
+                                                                    ADS1220_MUX_AIN0_AVSS + ADC_CHANNEL * 16, 
+                                                                    &ADS1220_default_regs,
+                                                                    ADC_DRDY_GPIO_Port, ADC_DRDY_Pin, 100);
+    ADC_CHANNEL++;
+    if (ADC_CHANNEL == 4) {
+    ADC_CHANNEL = 0;
+    }
+
+    SEGGER_RTT_printf(1, "%d,%d,%d,%d\n\r", device.adc_value[V_IN],
+                                            device.adc_value[V_OUT],
+                                            device.adc_value[I_IN],
+                                            device.adc_value[I_OUT]);
     B_Task_Ptr = &B1;
 }

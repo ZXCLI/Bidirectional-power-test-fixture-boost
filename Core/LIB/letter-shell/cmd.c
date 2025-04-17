@@ -35,7 +35,7 @@ int16_t SetClockPhases(uint8_t phases)
     uint8_t six_phase[6] = {1,24+1,48+1,72+1,96+1,1};   //六相全部工作
     uint8_t three_phase[3] = {1,60+1,1};                //三相只有1，3，6工作
 
-    static uint8_t last_phases = 0;
+    static uint8_t last_phases = 6;
     if (phases != last_phases)
     {
         if((phases != 0) && (phases != 1) && (phases != 2) && (phases != 3) && (phases != 6)){

@@ -134,6 +134,7 @@ void SysTick_Handler(void)
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
+  A_Task_Flag = 1;
 
   /* USER CODE END SysTick_IRQn 1 */
 }
@@ -197,8 +198,12 @@ void TIM15_IRQHandler(void)
   if (LL_TIM_IsActiveFlag_UPDATE(TIM15)) {
       LL_TIM_ClearFlag_UPDATE(TIM15);
     
-      A_Task_Flag = 1;
-      B_Task_Flag = 1;
+      static uint16_t Vtimer = 0;
+      Vtimer++;         // 1000/15 = 66Hz
+      if (Vtimer >= 15) {
+          Vtimer = 0;
+          B_Task_Flag = 1;
+      }
   }
   /* USER CODE END TIM15_IRQn 0 */
   /* USER CODE BEGIN TIM15_IRQn 1 */

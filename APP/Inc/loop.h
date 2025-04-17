@@ -38,7 +38,7 @@ typedef struct
     float DAC_current_ref;
     float DAC_voltage_now;
     float DAC_current_now;
-    uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
+    __IO uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
     uint16_t system_status;
 }Device;
 
