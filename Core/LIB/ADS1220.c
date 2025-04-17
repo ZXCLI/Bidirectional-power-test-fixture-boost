@@ -1,4 +1,5 @@
 #include "ADS1220.h"
+#include "delayus.h"
 
 void ADS1220_writeRegister(SPI_HandleTypeDef *hspi, uint8_t address, uint8_t value)
 {
@@ -132,7 +133,8 @@ int32_t ADS1220_read_blocking(SPI_HandleTypeDef *hspi, GPIO_TypeDef *DRDY_PORT, 
 
 	while (HAL_GPIO_ReadPin(DRDY_PORT, DRDY_PIN) == GPIO_PIN_SET)
 	{
-		HAL_Delay(1); // This is a bit hacky
+		//HAL_Delay(1); // This is a bit hacky
+        delay_us(200);
 		time++;
 		if (time >= timeout)
 			return 0;

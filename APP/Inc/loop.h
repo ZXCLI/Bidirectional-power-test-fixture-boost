@@ -11,6 +11,13 @@
 #include "ADS1220.h"
 #include "SEGGER_RTT.h"
 
+
+#define DEBUG1_IN HAL_GPIO_WritePin(TEST1_GPIO_Port, TEST1_Pin, GPIO_PIN_SET)
+#define DEBUG1_OUT HAL_GPIO_WritePin(TEST1_GPIO_Port, TEST1_Pin, GPIO_PIN_RESET)
+
+#define DEBUG2_IN HAL_GPIO_WritePin(TEST2_GPIO_Port, TEST2_Pin, GPIO_PIN_SET)
+#define DEBUG2_OUT HAL_GPIO_WritePin(TEST2_GPIO_Port, TEST2_Pin, GPIO_PIN_RESET)
+
 #define RunNormal GPIO_PIN_RESET
 #define StandBy   GPIO_PIN_SET
 
@@ -39,6 +46,7 @@ typedef struct
     float DAC_voltage_now;
     float DAC_current_now;
     __IO uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
+    uint8_t Vtimer_B_CCR;
     uint16_t system_status;
 }Device;
 
