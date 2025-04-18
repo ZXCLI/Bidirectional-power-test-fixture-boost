@@ -4,6 +4,7 @@
 #include "dac8552.h"
 #include "shell_port.h"
 #include "stdio.h"
+#include "least_squares.h"
 
 //这个文件用于注册shell命令
 
@@ -219,12 +220,15 @@ SHELL_EXPORT_CMD(
 void SetVoltageOrCurrent(DAC_CHANNELS channel, float value)
 {
     if (channel == VOLTAGE) {
-        //float voltage = value * 0.034275f + 0.000393f;
+        // float voltage = value * 0.034275f + 0.000393f;
         uint32_t voltage = (int)(value * device.dataConver[V_OUT].a1 + device.dataConver[V_OUT].a0);
-        DAC8552_WriteA_test(&hspi1, voltage); // 设置输出电压
+        //DAC8552_WriteA(&hspi1,voltage); // 设置输出电压
+        DAC8552_WriteA_test(voltage);
     } else if (channel == CURRENT) {
-        float current = value * 0.018614f + 0.131894;
-        DAC8552_WriteB(&hspi1, current); // 设置输入电流
+        // float current = value * 0.018614f + 0.131894;
+        uint32_t current = (int)(value * device.dataConver[I_IN].a1 + device.dataConver[I_IN].a0);
+        //DAC8552_WriteB(&hspi1, current); // 设置输入电流
+        DAC8552_WriteB_test(current);
     }
 }
 
@@ -260,4 +264,83 @@ void setIutputCurrent(float current)
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
     setIutputCurrent, setIutputCurrent, "SetOutputCurrent"
+);
+
+// 在运行下面的校准命令前，请先运行StartCalibration命令
+void StartCalibration(void)
+{
+    DAC8552_WriteA_test(13474); // 15V
+    DAC8552_WriteB_test(3696);  // 0.5A
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    StartCalibration, StartCalibration, "StartCalibration"
+);
+
+// 校准电压
+int CalibrationVoltage(float realVoltage)
+{
+    static uint8_t count = 0;
+    static float RealVolt[5] = {0}; //x
+
+    float DAC_input[5] = {13474.0f,17969.0f,22462.0f,26954.0f,31447.0f};//15V,20V,25V,30V,35V,y
+   
+    RealVolt[count] = realVoltage;
+    count++;
+    
+    if(count == 5)
+    {
+        count = 0;
+        LinearFitResult result;
+        if (Linear_LeastSquares_Fit(RealVolt,DAC_input,5,&result) == LS_OK){
+            SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
+            SEGGER_RTT_printf(0,"a1:%f,a0:%f,r:%f\n\r",result.slope,result.intercept,result.r_squared);
+            return 0; 
+        }else{
+            SEGGER_RTT_printf(0,"Linear_LeastSquares_Fit error\n\r");
+            return -1;
+        }
+    }
+    
+    DAC8552_WriteA_test((int)(DAC_input[count]));
+    return count;
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    CalibrationVoltage, CalibrationVoltage, "CalibrationVoltage realVoltage"
+);
+
+// 校准电流
+int CalibrationCurrent(float realCurrent)
+{
+    static uint8_t count     = 0;
+    static float RealCur[5] = {0}; // x
+
+    float DAC_input[5] = {3696.0f, 4430.0f, 5400.0f, 6370.0f, 7340.0f}; // 0.5A,2A,4A,6A,8A,y
+
+    RealCur[count] = realCurrent;
+    count++;
+
+    if (count == 5) {
+        count = 0;
+        LinearFitResult result;
+        if (Linear_LeastSquares_Fit(RealCur, DAC_input, 5, &result) == LS_OK) {
+            SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
+            SEGGER_RTT_printf(0, "a1:%f,a0:%f,r:%f\n\r", result.slope, result.intercept, result.r_squared);
+            return 0;
+        } else {
+            SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit error\n\r");
+            return -1;
+        }
+    }
+
+    DAC8552_WriteB_test((int)(DAC_input[count]));
+    return count;
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    CalibrationCurrent, CalibrationCurrent, "CalibrationCurrent realCurrent"
 );

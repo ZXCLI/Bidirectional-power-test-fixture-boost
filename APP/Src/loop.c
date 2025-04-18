@@ -4,6 +4,7 @@
 #include "cmd.h"
 #include "delayus.h" 
 #include "eeprom.h"
+#include "least_squares.h"
 
 Device device;
 
@@ -22,6 +23,10 @@ ADS1220_regs ADS1220_default_regs = {
     .cfg_reg2 = (0x01 << 6) | (0x01 << 4),  // 外部参考电压，FIR为50Hz
     .cfg_reg3 = 0x00                        // 关闭IDAC
 };
+
+LinearFitResult result;
+float x_data[] = {0, 1, 2, 3, 4, 5, 100}; // 最后一个是异常值
+float y_data[] = {1, 3, 5, 7, 9, 11, 150};
 
 void MY_Init(void)
 {
@@ -48,10 +53,20 @@ void MY_Init(void)
 
     rttShellInit(); // 初始化RTT Shell
 
-    SetVoltageOrCurrent(VOLTAGE,14.0f); // 直接设置输出电压
-    SetVoltageOrCurrent(CURRENT,0.1f);  // 直接设置输入电流
-    device.DAC_voltage_ref = 15.0f;
-    device.DAC_current_ref = 0.6f;
+    device.dataConver[V_OUT].a1 = 899.897461f;
+    device.dataConver[V_OUT].a0 = -111.287498f;
+    device.dataConver[I_IN].a1  = 485.702087f;
+    device.dataConver[I_IN].a0  = 3586.960938f;
+
+    // SetVoltageOrCurrent(VOLTAGE,14.0f); // 直接设置输出电压
+    // SetVoltageOrCurrent(CURRENT,0.1f);  // 直接设置输入电流
+    // device.DAC_voltage_ref = 15.0f;
+    // device.DAC_current_ref = 0.6f;
+
+    DAC8552_WriteA(&hspi1,0.512f);  // 15.0V
+    DAC8552_WriteB(&hspi1,0.14f); // 0.5A
+
+    SetVoltageOrCurrent(VOLTAGE,15.0f); // 直接设置输出电压
 
     HAL_Delay(100);
 
@@ -210,11 +225,10 @@ void B1(void)
         HAL_GPIO_TogglePin(TEST1_GPIO_Port, TEST1_Pin);
     }
 
-    uint8_t tx_test[24] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17};
-    uint8_t rx_test[256] = {0};
-    //at24_EraseMemFull();
-    //at24_HAL_write(&hi2c1,10,6,24,tx_test);
-    at24_RandomRead(&hi2c1,0,0,256,rx_test);
+    LS_Status status = Linear_LeastSquares_Fit(x_data, y_data, 7, &result);
+    if (status == LS_OK) {
+        //printf("Slope: %.2f, Intercept: %.2f\n", result.slope, result.intercept);
+    }
 
     B_Task_Ptr = &B1;
 }

@@ -19,6 +19,6 @@ void DAC8552_WriteData(SPI_HandleTypeDef *hspi, uint32_t Data);
 void DAC8552_WriteA(SPI_HandleTypeDef *hspi, float Voltage);
 void DAC8552_WriteB(SPI_HandleTypeDef *hspi, float Voltage);
 
-void DAC8552_WriteA_test(SPI_HandleTypeDef *hspi, uint32_t Data);
-
+void DAC8552_WriteA_test(uint32_t Data);
+void DAC8552_WriteB_test(uint32_t Data);
 #endif

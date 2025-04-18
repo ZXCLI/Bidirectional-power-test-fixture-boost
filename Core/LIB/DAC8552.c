@@ -1,4 +1,5 @@
 #include "DAC8552.h"
+#include "spi.h"
 
 void DAC8552_WriteData(SPI_HandleTypeDef *hspi, uint32_t Data)
 {
@@ -44,10 +45,10 @@ void DAC8552_WriteA(SPI_HandleTypeDef *hspi,float Voltage)
   DAC8552_WriteData(hspi, Data);
 }
 
-void DAC8552_WriteA_test(SPI_HandleTypeDef *hspi,uint32_t Data)
+void DAC8552_WriteA_test(uint32_t Data)
 {
   Data = DAC8552_ChannelA|Data;
-  DAC8552_WriteData(hspi, Data);
+  DAC8552_WriteData(&hspi1, Data);
 }
 
 //******************************************
@@ -63,4 +64,10 @@ void DAC8552_WriteB(SPI_HandleTypeDef *hspi,float Voltage)
   Data = DAC8552_VoltageToData(DAC8552_Vref, Voltage);
   Data = DAC8552_ChannelB|Data;
   DAC8552_WriteData(hspi, Data);
+}
+
+void DAC8552_WriteB_test(uint32_t Data)
+{
+  Data = DAC8552_ChannelB|Data;
+  DAC8552_WriteData(&hspi1, Data);
 }
