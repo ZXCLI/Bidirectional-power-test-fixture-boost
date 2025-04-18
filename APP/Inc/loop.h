@@ -37,6 +37,12 @@ typedef enum
 
 typedef struct
 {
+    float a0;   // y = a0 + a1 * x
+    float a1;
+} DataConverCoeff;
+
+typedef struct
+{
     float V_IN;
     float V_OUT;
     float I_IN;
@@ -46,6 +52,7 @@ typedef struct
     float DAC_voltage_now;
     float DAC_current_now;
     __IO uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
+    DataConverCoeff dataConver[4];
     uint8_t Vtimer_B_CCR;
     uint16_t system_status;
 }Device;

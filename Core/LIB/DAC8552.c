@@ -44,6 +44,12 @@ void DAC8552_WriteA(SPI_HandleTypeDef *hspi,float Voltage)
   DAC8552_WriteData(hspi, Data);
 }
 
+void DAC8552_WriteA_test(SPI_HandleTypeDef *hspi,uint32_t Data)
+{
+  Data = DAC8552_ChannelA|Data;
+  DAC8552_WriteData(hspi, Data);
+}
+
 //******************************************
 //函数名称：DAC8552_WriteB
 //函数功能：写数据给通道B

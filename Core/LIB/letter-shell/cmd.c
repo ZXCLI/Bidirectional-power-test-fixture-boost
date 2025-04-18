@@ -219,8 +219,9 @@ SHELL_EXPORT_CMD(
 void SetVoltageOrCurrent(DAC_CHANNELS channel, float value)
 {
     if (channel == VOLTAGE) {
-        float voltage = value * 0.034275f + 0.000393f;
-        DAC8552_WriteA(&hspi1, voltage); // 设置输出电压
+        //float voltage = value * 0.034275f + 0.000393f;
+        uint32_t voltage = (int)(value * device.dataConver[V_OUT].a1 + device.dataConver[V_OUT].a0);
+        DAC8552_WriteA_test(&hspi1, voltage); // 设置输出电压
     } else if (channel == CURRENT) {
         float current = value * 0.018614f + 0.131894;
         DAC8552_WriteB(&hspi1, current); // 设置输入电流

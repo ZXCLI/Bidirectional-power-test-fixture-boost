@@ -3,6 +3,7 @@
 #include "stdio.h"
 #include "cmd.h"
 #include "delayus.h" 
+#include "eeprom.h"
 
 Device device;
 
@@ -50,7 +51,7 @@ void MY_Init(void)
     SetVoltageOrCurrent(VOLTAGE,14.0f); // 直接设置输出电压
     SetVoltageOrCurrent(CURRENT,0.1f);  // 直接设置输入电流
     device.DAC_voltage_ref = 15.0f;
-    device.DAC_voltage_ref = 0.6f;
+    device.DAC_current_ref = 0.6f;
 
     HAL_Delay(100);
 
@@ -127,21 +128,21 @@ float Slew_Func(float *slewVal, float refVal, float slewRate)
 // 通过斜坡函数更新DAC输出
 void updateDAC()
 {
-    if(Slew_Func(&device.DAC_voltage_now, device.DAC_voltage_ref, 0.1f) != 0)
-    {
-        SetVoltageOrCurrent(VOLTAGE,device.DAC_voltage_now);
-    }
-    if(Slew_Func(&device.DAC_current_now, device.DAC_current_ref, 0.1f) != 0)
-    {
-        SetVoltageOrCurrent(CURRENT,device.DAC_current_now);
-    }
+    Slew_Func(&device.DAC_voltage_now, device.DAC_voltage_ref, 0.05f);
+    SetVoltageOrCurrent(VOLTAGE,device.DAC_voltage_now);
+    
+    Slew_Func(&device.DAC_current_now, device.DAC_current_ref, 0.05f);
+    SetVoltageOrCurrent(CURRENT,device.DAC_current_now);
+    
 }
 
 void A0(void)       // A分支1KHz
 {
     if(A_Task_Flag)
     {   A_Task_Flag = false;
+        DEBUG2_IN;
         (*A_Task_Ptr)();    // 执行A分支任务
+        DEBUG2_OUT;
     }
     Alpha_State_Ptr = &B0;  // 转换到B分支
 }
@@ -157,7 +158,7 @@ void B0(void)       // B分支66Hz
 
 void A1(void)
 {
-    DEBUG2_IN;
+    
     // A分支任务1，读取RTT输入，运行Shell
     char data[128] = {0};
     uint16_t len = 0;
@@ -168,7 +169,7 @@ void A1(void)
     }
 
     A_Task_Ptr = &A2;
-    DEBUG2_OUT;
+    
 }
 
 void A2(void)
@@ -208,6 +209,12 @@ void B1(void)
         Vtimer_B1 = 0;
         HAL_GPIO_TogglePin(TEST1_GPIO_Port, TEST1_Pin);
     }
+
+    uint8_t tx_test[24] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17};
+    uint8_t rx_test[256] = {0};
+    //at24_EraseMemFull();
+    //at24_HAL_write(&hi2c1,10,6,24,tx_test);
+    at24_RandomRead(&hi2c1,0,0,256,rx_test);
 
     B_Task_Ptr = &B1;
 }
