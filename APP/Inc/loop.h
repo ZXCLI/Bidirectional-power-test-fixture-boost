@@ -51,8 +51,9 @@ typedef struct
     float DAC_current_ref;
     float DAC_voltage_now;
     float DAC_current_now;
-    __IO uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
-    DataConverCoeff dataConver[4];
+    uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
+    DataConverCoeff ADCdataConver[4];   // ADC值转实际电压电流值
+    DataConverCoeff DACdataConver[4];   // 设定值转DAC值，为了保持一致性，虽然只有两个通道，但是和上面一样定义为4个
     uint8_t Vtimer_B_CCR;
     uint16_t system_status;
 }Device;

@@ -220,13 +220,15 @@ SHELL_EXPORT_CMD(
 void SetVoltageOrCurrent(DAC_CHANNELS channel, float value)
 {
     if (channel == VOLTAGE) {
-        // float voltage = value * 0.034275f + 0.000393f;
-        uint32_t voltage = (int)(value * device.dataConver[V_OUT].a1 + device.dataConver[V_OUT].a0);
+        // float voltage = value * 0.034275f + 0.000393f;<---> 映射关系：DAC_A输出电压 = 0.034275*输入电压V + 0.000393
+        uint32_t voltage = (int)(value * device.DACdataConver[V_OUT].a1 + device.DACdataConver[V_OUT].a0);
+        // 现在改为直接用输出电压映射到DAC的16位数值
         //DAC8552_WriteA(&hspi1,voltage); // 设置输出电压
         DAC8552_WriteA_test(voltage);
     } else if (channel == CURRENT) {
-        // float current = value * 0.018614f + 0.131894;
-        uint32_t current = (int)(value * device.dataConver[I_IN].a1 + device.dataConver[I_IN].a0);
+        // float current = value * 0.018614f + 0.131894;<---> 映射关系：DAC_B输出电压 = 0.018614*输入电流A + 0.131894
+        uint32_t current = (int)(value * device.DACdataConver[I_IN].a1 + device.DACdataConver[I_IN].a0);
+        // 现在改为直接用输入电流映射到DAC的16位数值
         //DAC8552_WriteB(&hspi1, current); // 设置输入电流
         DAC8552_WriteB_test(current);
     }
@@ -270,7 +272,7 @@ SHELL_EXPORT_CMD(
 void StartCalibration(void)
 {
     DAC8552_WriteA_test(13474); // 15V
-    DAC8552_WriteB_test(3696);  // 0.5A
+    DAC8552_WriteB_test(3942);  // 1A
 }
 
 SHELL_EXPORT_CMD(
@@ -283,19 +285,26 @@ int CalibrationVoltage(float realVoltage)
 {
     static uint8_t count = 0;
     static float RealVolt[5] = {0}; //x
+    static float ADC_date[5] = {0}; //x
 
     float DAC_input[5] = {13474.0f,17969.0f,22462.0f,26954.0f,31447.0f};//15V,20V,25V,30V,35V,y
    
     RealVolt[count] = realVoltage;
+    ADC_date[count] = (float)(device.adc_value[V_OUT]);
     count++;
     
     if(count == 5)
     {
         count = 0;
-        LinearFitResult result;
-        if (Linear_LeastSquares_Fit(RealVolt,DAC_input,5,&result) == LS_OK){
+        LinearFitResult result_voltTOdac;
+        LinearFitResult result_adcTOvolt;
+        if ((Linear_LeastSquares_Fit(RealVolt,DAC_input,5,&result_voltTOdac) == LS_OK) &&
+            (Linear_LeastSquares_Fit(ADC_date,RealVolt,5,&result_adcTOvolt) == LS_OK)){
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
-            SEGGER_RTT_printf(0,"a1:%f,a0:%f,r:%f\n\r",result.slope,result.intercept,result.r_squared);
+            SEGGER_RTT_printf(0,"Voltage to DAC a1:%f,a0:%f,r:%f\n\r",
+                                result_voltTOdac.slope,result_voltTOdac.intercept,result_voltTOdac.r_squared);
+            SEGGER_RTT_printf(0,"ADC to Voltage a1:%f,a0:%f,r:%f\n\r",
+                                result_adcTOvolt.slope,result_adcTOvolt.intercept,result_adcTOvolt.r_squared);
             return 0; 
         }else{
             SEGGER_RTT_printf(0,"Linear_LeastSquares_Fit error\n\r");
@@ -317,18 +326,25 @@ int CalibrationCurrent(float realCurrent)
 {
     static uint8_t count     = 0;
     static float RealCur[5] = {0}; // x
+    static float ADC_date[5] = {0}; // x
 
-    float DAC_input[5] = {3696.0f, 4430.0f, 5400.0f, 6370.0f, 7340.0f}; // 0.5A,2A,4A,6A,8A,y
+    float DAC_input[5] = {3942.0f, 4430.0f, 5400.0f, 6370.0f, 7340.0f}; // 1A,2A,4A,6A,8A,y
 
     RealCur[count] = realCurrent;
+    ADC_date[count] = (float)(device.adc_value[I_IN]);
     count++;
 
     if (count == 5) {
         count = 0;
-        LinearFitResult result;
-        if (Linear_LeastSquares_Fit(RealCur, DAC_input, 5, &result) == LS_OK) {
+        LinearFitResult result_curTOdac;
+        LinearFitResult result_adcTOcur;
+        if ((Linear_LeastSquares_Fit(RealCur, DAC_input, 5, &result_curTOdac) == LS_OK) && 
+            (Linear_LeastSquares_Fit(ADC_date, RealCur, 5, &result_adcTOcur) == LS_OK)) {
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
-            SEGGER_RTT_printf(0, "a1:%f,a0:%f,r:%f\n\r", result.slope, result.intercept, result.r_squared);
+            SEGGER_RTT_printf(0, "Current to DAC a1:%f,a0:%f,r:%f\n\r", 
+                                 result_curTOdac.slope, result_curTOdac.intercept, result_curTOdac.r_squared);
+            SEGGER_RTT_printf(0, "ADC to Current a1:%f,a0:%f,r:%f\n\r",
+                                 result_adcTOcur.slope, result_adcTOcur.intercept, result_adcTOcur.r_squared);
             return 0;
         } else {
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit error\n\r");

@@ -45,6 +45,7 @@ void DAC8552_WriteA(SPI_HandleTypeDef *hspi,float Voltage)
   DAC8552_WriteData(hspi, Data);
 }
 
+// 直接写入16位数据
 void DAC8552_WriteA_test(uint32_t Data)
 {
   Data = DAC8552_ChannelA|Data;
@@ -66,6 +67,7 @@ void DAC8552_WriteB(SPI_HandleTypeDef *hspi,float Voltage)
   DAC8552_WriteData(hspi, Data);
 }
 
+// 直接写入16位数据
 void DAC8552_WriteB_test(uint32_t Data)
 {
   Data = DAC8552_ChannelB|Data;

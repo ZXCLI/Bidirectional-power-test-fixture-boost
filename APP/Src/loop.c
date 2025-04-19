@@ -53,10 +53,10 @@ void MY_Init(void)
 
     rttShellInit(); // 初始化RTT Shell
 
-    device.dataConver[V_OUT].a1 = 899.897461f;
-    device.dataConver[V_OUT].a0 = -111.287498f;
-    device.dataConver[I_IN].a1  = 485.702087f;
-    device.dataConver[I_IN].a0  = 3586.960938f;
+    device.DACdataConver[V_OUT].a1 = 899.897461f;
+    device.DACdataConver[V_OUT].a0 = -111.287498f;
+    device.DACdataConver[I_IN].a1  = 485.702087f;
+    device.DACdataConver[I_IN].a0  = 3586.960938f;
 
     // SetVoltageOrCurrent(VOLTAGE,14.0f); // 直接设置输出电压
     // SetVoltageOrCurrent(CURRENT,0.1f);  // 直接设置输入电流
@@ -67,6 +67,7 @@ void MY_Init(void)
     DAC8552_WriteB(&hspi1,0.14f); // 0.5A
 
     SetVoltageOrCurrent(VOLTAGE,15.0f); // 直接设置输出电压
+    SetVoltageOrCurrent(CURRENT,1.0f);  // 直接设置输入电流
 
     HAL_Delay(100);
 
@@ -198,10 +199,12 @@ void B1(void)
 {
     // B分支任务1，读取ADC数据
 
-    static uint8_t ADC_CHANNEL = 0; // 使用O1和Og优化时，这里在读取ADC数据的时候会跑飞，很奇怪  
+    static uint8_t ADC_CHANNEL = 0; 
+    // 使用O1和Og优化时，下面的代码在读取ADC数据的时候会跑飞，很奇怪  
     
     ADC_CHANNEL++;
     if (ADC_CHANNEL == 4) {ADC_CHANNEL = 0;}
+    
     uint8_t Forward_data_index = (ADC_CHANNEL + 3) % 4; // 读取上一轮触发的ADC数据
     device.adc_value[Forward_data_index] = ADS1220_read_blocking(&hspi2,
                                                                  ADC_DRDY_GPIO_Port,
@@ -211,6 +214,15 @@ void B1(void)
                               &ADS1220_default_regs);
     ADS1220_start_conversion(&hspi2);   
     // 触发本轮的ADC转换，经过状态机切换的延时，ADC转换完成，在下一轮开头读取数据
+
+    device.V_OUT = device.adc_value[V_OUT] * device.ADCdataConver[V_OUT].a1 
+                    + device.ADCdataConver[V_OUT].a0;
+    device.I_OUT = device.adc_value[I_OUT] * device.ADCdataConver[I_OUT].a1 
+                    + device.ADCdataConver[I_OUT].a0;
+    device.V_IN = device.adc_value[V_IN] * device.ADCdataConver[V_IN].a1 
+                    + device.ADCdataConver[V_IN].a0;
+    device.I_IN = device.adc_value[I_IN] * device.ADCdataConver[I_IN].a1
+                    + device.ADCdataConver[I_IN].a0;
     
     SEGGER_RTT_printf(1, "%d,%d,%d,%d\n\r", device.adc_value[V_IN],
                                             device.adc_value[V_OUT],
