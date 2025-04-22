@@ -1,7 +1,6 @@
 #ifndef _LOOP_H
 #define _LOOP_H
 
-#include "stdbool.h"
 #include "main.h"
 #include "spi.h"
 #include "tim.h"
@@ -54,14 +53,12 @@ typedef struct
     uint32_t adc_value[4]; // 0:V_IN 1:V_OUT 2:I_IN 3:I_OUT
     DataConverCoeff ADCdataConver[4];   // ADC值转实际电压电流值
     DataConverCoeff DACdataConver[4];   // 设定值转DAC值，为了保持一致性，虽然只有两个通道，但是和上面一样定义为4个
+    uint16_t phase;   // 运行的相数
     uint8_t Vtimer_B_CCR;
     uint16_t system_status;
 }Device;
 
 extern Device device;
-
-extern bool A_Task_Flag; // A分支任务标志
-extern bool B_Task_Flag; // B分支任务标志
 
 void MY_Init();
 void MY_Loop();
@@ -71,13 +68,7 @@ void moduleClockInit();
 void fanPWMInit();
 float Slew_Func(float *slewVal, float refVal, float slewRate);
 void updateDAC();
+int limiteCurrent();
 
-void A0(void);
-void A1(void);
-void A2(void);
-
-void B0(void);
-void B1(void);
-void B2(void);
 
 #endif /* _LOOP_H */

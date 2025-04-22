@@ -199,7 +199,7 @@ int16_t SetClockPhases(uint8_t phases)
                 LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
                 break;
-            case (0|(0<<3))://零相转一相
+            case (0|(1<<3))://零相转一相
                 HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
                 LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 break;
@@ -207,6 +207,10 @@ int16_t SetClockPhases(uint8_t phases)
                 break;
         }
         last_phases = phases;
+        device.phase = phases;  // 保存当前相位
+        if(limiteCurrent() == 1){
+            SEGGER_RTT_printf(0, "ERROR:The current is too high and has been adjusted to %f\r\n", device.DAC_current_ref);
+        }
     }
     return phases;
 }
@@ -260,6 +264,9 @@ void setIutputCurrent(float current)
     }else
     {
         device.DAC_current_ref = current;
+        if (limiteCurrent() == 1) {
+            SEGGER_RTT_printf(0, "ERROR:The current is too high and has been adjusted to %f\r\n", device.DAC_current_ref);
+        }
     }
 }
 
@@ -303,8 +310,8 @@ int CalibrationVoltage(float realVoltage)
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
             SEGGER_RTT_printf(0,"Voltage to DAC a1:%f,a0:%f,r:%f\n\r",
                                 result_voltTOdac.slope,result_voltTOdac.intercept,result_voltTOdac.r_squared);
-            SEGGER_RTT_printf(0,"ADC to Voltage a1:%f,a0:%f,r:%f\n\r",
-                                result_adcTOvolt.slope,result_adcTOvolt.intercept,result_adcTOvolt.r_squared);
+            SEGGER_RTT_printf(0,"ADC to Voltage (x1000) a1:%f,(x1000) a0:%f,r:%f\n\r",
+                                result_adcTOvolt.slope*1000.0f,result_adcTOvolt.intercept*1000.0f,result_adcTOvolt.r_squared);
             return 0; 
         }else{
             SEGGER_RTT_printf(0,"Linear_LeastSquares_Fit error\n\r");
@@ -343,8 +350,8 @@ int CalibrationCurrent(float realCurrent)
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
             SEGGER_RTT_printf(0, "Current to DAC a1:%f,a0:%f,r:%f\n\r", 
                                  result_curTOdac.slope, result_curTOdac.intercept, result_curTOdac.r_squared);
-            SEGGER_RTT_printf(0, "ADC to Current a1:%f,a0:%f,r:%f\n\r",
-                                 result_adcTOcur.slope, result_adcTOcur.intercept, result_adcTOcur.r_squared);
+            SEGGER_RTT_printf(0, "ADC to Current (x1000) a1:%f,(x1000) a0:%f,r:%f\n\r",
+                                 result_adcTOcur.slope*1000.0f, result_adcTOcur.intercept*1000.0f, result_adcTOcur.r_squared);
             return 0;
         } else {
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit error\n\r");
@@ -359,4 +366,24 @@ int CalibrationCurrent(float realCurrent)
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
     CalibrationCurrent, CalibrationCurrent, "CalibrationCurrent realCurrent"
+);
+
+void sendCruent(void)
+{
+    SEGGER_RTT_printf(0, "Current:%f\n\r", device.DAC_current_ref);
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    sendCruent, sendCruent, "sendCruent"
+);
+
+void sendVoltage(void) 
+{
+    SEGGER_RTT_printf(0, "Voltage:%f\n\r", device.DAC_voltage_ref);
+}
+
+SHELL_EXPORT_CMD(   
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    sendVoltage, sendVoltage, "sendVoltage"
 );

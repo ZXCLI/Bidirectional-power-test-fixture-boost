@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "shell_port.h"
 #include "loop.h"
+#include "state_machine.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

@@ -5,17 +5,12 @@
 #include "delayus.h" 
 #include "eeprom.h"
 #include "least_squares.h"
+#include "state_machine.h"
 
 Device device;
 
 char rttLogWriteBuffer[512];
 char rttLogReadBuffer[512];
-
-void (*Alpha_State_Ptr)(void); // 基态状态机指针
-void (*A_Task_Ptr)(void);      // A分支任务指针
-void (*B_Task_Ptr)(void);      // B分支任务指针
-bool A_Task_Flag = false;      // A分支任务标志
-bool B_Task_Flag = false;      // B分支任务标志
 
 ADS1220_regs ADS1220_default_regs = {
     .cfg_reg0 = 0x00,                       // 关闭PGA
@@ -24,9 +19,7 @@ ADS1220_regs ADS1220_default_regs = {
     .cfg_reg3 = 0x00                        // 关闭IDAC
 };
 
-LinearFitResult result;
-float x_data[] = {0, 1, 2, 3, 4, 5, 100}; // 最后一个是异常值
-float y_data[] = {1, 3, 5, 7, 9, 11, 150};
+
 
 void MY_Init(void)
 {
@@ -43,6 +36,7 @@ void MY_Init(void)
 
     fanPWMInit();           // 初始化风扇PWM
     SetClockPhases(0);      // 设置相数
+    device.phase = 0;       // 保存相数
 
     HAL_GPIO_WritePin(ADC_CS_GPIO_Port, ADC_CS_Pin, GPIO_PIN_RESET);    // ADC片选直接下拉
     HAL_GPIO_WritePin(DAC_CS_GPIO_Port, DAC_CS_Pin, GPIO_PIN_SET);      // DAC片选上拉
@@ -53,10 +47,13 @@ void MY_Init(void)
 
     rttShellInit(); // 初始化RTT Shell
 
-    device.DACdataConver[V_OUT].a1 = 899.897461f;
-    device.DACdataConver[V_OUT].a0 = -111.287498f;
+    device.DACdataConver[V_OUT].a1 = 902.119202f;
+    device.DACdataConver[V_OUT].a0 = -143.923431f;
     device.DACdataConver[I_IN].a1  = 485.702087f;
     device.DACdataConver[I_IN].a0  = 3586.960938f;
+
+    device.ADCdataConver[V_OUT].a1 = 0.008689f/1000.0f;
+    device.ADCdataConver[V_OUT].a0 = 11.676025f/1000.0f;
 
     // SetVoltageOrCurrent(VOLTAGE,14.0f); // 直接设置输出电压
     // SetVoltageOrCurrent(CURRENT,0.1f);  // 直接设置输入电流
@@ -152,95 +149,14 @@ void updateDAC()
     
 }
 
-void A0(void)       // A分支1KHz
+int limiteCurrent(void)
 {
-    if(A_Task_Flag)
-    {   A_Task_Flag = false;
-        DEBUG2_IN;
-        (*A_Task_Ptr)();    // 执行A分支任务
-        DEBUG2_OUT;
-    }
-    Alpha_State_Ptr = &B0;  // 转换到B分支
-}
-
-void B0(void)       // B分支66Hz
-{
-    if(B_Task_Flag)
-    {   B_Task_Flag = false;
-        (*B_Task_Ptr)();    // 执行B分支任务
-    }
-    Alpha_State_Ptr = &A0;  // 转换到A分支
-}
-
-void A1(void)
-{
-    
-    // A分支任务1，读取RTT输入，运行Shell
-    char data[128] = {0};
-    uint16_t len = 0;
-    len = rttShellRead(data, 128);
-
-    for (uint16_t i = 0; i < len; i++) {
-        shellHandler(&rttShell, data[i]);
-    }
-
-    A_Task_Ptr = &A2;
-    
-}
-
-void A2(void)
-{
-    // A分支任务2，使用斜坡函数更新DAC输出
-    updateDAC();
-    A_Task_Ptr = &A1;
-}
-
-void B1(void)
-{
-    // B分支任务1，读取ADC数据
-
-    static uint8_t ADC_CHANNEL = 0; 
-    // 使用O1和Og优化时，下面的代码在读取ADC数据的时候会跑飞，很奇怪  
-    
-    ADC_CHANNEL++;
-    if (ADC_CHANNEL == 4) {ADC_CHANNEL = 0;}
-    
-    uint8_t Forward_data_index = (ADC_CHANNEL + 3) % 4; // 读取上一轮触发的ADC数据
-    device.adc_value[Forward_data_index] = ADS1220_read_blocking(&hspi2,
-                                                                 ADC_DRDY_GPIO_Port,
-                                                                 ADC_DRDY_Pin, 100);
-
-    ADS1220_select_mux_config(&hspi2, ADS1220_MUX_AIN0_AVSS + ADC_CHANNEL * 16,
-                              &ADS1220_default_regs);
-    ADS1220_start_conversion(&hspi2);   
-    // 触发本轮的ADC转换，经过状态机切换的延时，ADC转换完成，在下一轮开头读取数据
-
-    device.V_OUT = device.adc_value[V_OUT] * device.ADCdataConver[V_OUT].a1 
-                    + device.ADCdataConver[V_OUT].a0;
-    device.I_OUT = device.adc_value[I_OUT] * device.ADCdataConver[I_OUT].a1 
-                    + device.ADCdataConver[I_OUT].a0;
-    device.V_IN = device.adc_value[V_IN] * device.ADCdataConver[V_IN].a1 
-                    + device.ADCdataConver[V_IN].a0;
-    device.I_IN = device.adc_value[I_IN] * device.ADCdataConver[I_IN].a1
-                    + device.ADCdataConver[I_IN].a0;
-    
-    SEGGER_RTT_printf(1, "%d,%d,%d,%d\n\r", device.adc_value[V_IN],
-                                            device.adc_value[V_OUT],
-                                            device.adc_value[I_IN],
-                                            device.adc_value[I_OUT]);
-    
-    // Toggle the LED
-    static uint16_t Vtimer_B1 = 0;
-    Vtimer_B1++;
-    if (Vtimer_B1 >= device.Vtimer_B_CCR) {
-        Vtimer_B1 = 0;
-        HAL_GPIO_TogglePin(TEST1_GPIO_Port, TEST1_Pin);
-    }
-
-    LS_Status status = Linear_LeastSquares_Fit(x_data, y_data, 7, &result);
-    if (status == LS_OK) {
-        //printf("Slope: %.2f, Intercept: %.2f\n", result.slope, result.intercept);
-    }
-
-    B_Task_Ptr = &B1;
+    if(device.phase != 0)
+    {
+        if (device.DAC_current_ref > device.phase * 20.0f) {
+            device.DAC_current_ref = device.phase * 20.0f;
+            return 1;
+        }
+    }// 限制每相最高输入电流为20A
+    return 0;
 }
