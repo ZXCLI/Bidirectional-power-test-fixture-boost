@@ -1,4 +1,5 @@
 #include "loop.h"
+#include "string.h"
 #include "shell_port.h"
 #include "stdio.h"
 #include "cmd.h"
@@ -6,6 +7,8 @@
 #include "eeprom.h"
 #include "least_squares.h"
 #include "state_machine.h"
+
+#define QUEUE_SIZE 16
 
 Device device;
 
@@ -28,8 +31,10 @@ void MY_Init(void)
 
     SEGGER_RTT_Init();
     //配置通道一的缓冲区
-    SEGGER_RTT_ConfigUpBuffer(1, "Log", rttLogWriteBuffer, 512, SEGGER_RTT_MODE_NO_BLOCK_SKIP); // 配置写缓冲
-    SEGGER_RTT_ConfigDownBuffer(1, "Log", rttLogReadBuffer, 512, SEGGER_RTT_MODE_NO_BLOCK_SKIP); // 配置读缓冲
+    SEGGER_RTT_ConfigUpBuffer(1, "Log", rttLogWriteBuffer, 
+                            512, SEGGER_RTT_MODE_NO_BLOCK_SKIP); // 配置写缓冲
+    SEGGER_RTT_ConfigDownBuffer(1, "Log", rttLogReadBuffer, 
+                            512, SEGGER_RTT_MODE_NO_BLOCK_SKIP); // 配置读缓冲
 
     UVLO_ALL_Close();       // 关闭所有模块
     moduleClockInit();      // 初始化时钟
@@ -65,6 +70,8 @@ void MY_Init(void)
 
     SetVoltageOrCurrent(VOLTAGE,15.0f); // 直接设置输出电压
     SetVoltageOrCurrent(CURRENT,1.0f);  // 直接设置输入电流
+
+    eepromWrite(0x00,"",0x00,0x00);
 
     HAL_Delay(100);
 
@@ -159,4 +166,113 @@ int limiteCurrent(void)
         }
     }// 限制每相最高输入电流为20A
     return 0;
+}
+
+// // 异步写入EEPROM，每次最多写一页
+// void eepromWrite(uint16_t len, uint8_t *data, uint8_t PageAddr, uint8_t ByteAddr)
+// {
+//     static dataQueue data_queue[16] = {0};  // 队列,最长支持16个任务
+//     static uint8_t len_queue = 0;           // 队列长度
+
+//     if(len_queue == 0){return;}     // 队列为空，直接返回
+
+//     if(len == 0)// 按页写效率最高
+//     {
+//         if((data_queue[len_queue].len + data_queue[len_queue].ByteAddr) 
+//             > ONE_PAGE_BYTE) // 如果当前任务中的数据长度加上当前地址大于一页，则分页写
+//         {
+//             at24_PageWrite(&hi2c1,data_queue[len_queue].PageAddr,
+//                            data_queue[len_queue].ByteAddr,
+//                            ONE_PAGE_BYTE - data_queue[len_queue].ByteAddr,
+//                            data_queue[len_queue].data);
+//             data_queue[len_queue].len -= (ONE_PAGE_BYTE - data_queue[len_queue].ByteAddr);
+//             data_queue[len_queue].ByteAddr = 0;
+//             data_queue[len_queue].PageAddr ++;
+//         }else{// 最后一页或者数据长度小于等于一页
+//             at24_PageWrite(&hi2c1,data_queue[len_queue].PageAddr,
+//                            data_queue[len_queue].ByteAddr,
+//                            data_queue[len_queue].len,
+//                            data_queue[len_queue].data);
+            
+//             data_queue[len_queue].len -= (data_queue[len_queue].len <= ONE_PAGE_BYTE) \
+//                                          ? data_queue[len_queue].len : ONE_PAGE_BYTE ;
+
+//             if(data_queue[len_queue].len == 0)
+//             {
+//                 len_queue --;   // 任务完成，从队列中删除
+//             }
+//         }
+//     }else{// 往队列中添加任务
+//         len_queue ++;
+//         data_queue[len_queue].len = len;
+//         data_queue[len_queue].PageAddr = PageAddr;
+//         data_queue[len_queue].ByteAddr = ByteAddr;
+//         for(int i = 0; i < len; i++)
+//         {
+//             data_queue[len_queue].data[i] = data[i];
+//         }
+//     }    
+// }
+
+// 异步写入EEPROM，每次最多写一页
+void eepromWrite(uint16_t len, uint8_t *data, uint8_t PageAddr, uint8_t ByteAddr)
+{
+    static dataQueue queue[QUEUE_SIZE]; // 循环队列
+    static uint8_t head  = 0;           // 队列头部索引
+    static uint8_t tail  = 0;           // 队列尾部索引
+    static uint8_t count = 0;           // 当前任务数
+
+    if (len == 0) {
+        // 处理队列中的任务（len=0表示触发写入）
+        if (count == 0) return; // 队列为空，直接返回
+
+        dataQueue *current = &queue[head];
+        uint16_t remaining = current->len - current->offset; // 剩余待写入数据长度
+
+        // 计算本次写入长度（不超过页边界）
+        uint16_t write_len;
+        if ((current->ByteAddr + remaining) > ONE_PAGE_BYTE) {
+            write_len = ONE_PAGE_BYTE - current->ByteAddr;
+        } else {
+            write_len = remaining;
+        }
+
+        // 执行页写入
+        at24_PageWrite(
+            &hi2c1,
+            current->PageAddr,
+            current->ByteAddr,
+            write_len,
+            current->data + current->offset // 直接定位到未写入的数据位置
+        );
+
+        // 更新任务状态
+        current->offset += write_len;
+        current->ByteAddr += write_len;
+
+        // 检查是否需要翻页
+        if (current->ByteAddr >= ONE_PAGE_BYTE) {
+            current->PageAddr++;
+            current->ByteAddr = 0;
+        }
+
+        // 如果任务完成，移除队列头部
+        if (current->offset >= current->len) {
+            head = (head + 1) % QUEUE_SIZE;
+            count--;
+        }
+    } else {
+        // 添加新任务到队列（len>0）
+        if (count >= QUEUE_SIZE) return; // 队列已满
+
+        dataQueue *new_task = &queue[tail];
+        new_task->len       = len;
+        new_task->offset    = 0; // 初始偏移量为0
+        new_task->PageAddr  = PageAddr;
+        new_task->ByteAddr  = ByteAddr;
+        //new_task->data      = data; // 直接引用用户数据指针，无需拷贝
+
+        tail = (tail + 1) % QUEUE_SIZE;
+        count++;
+    }
 }

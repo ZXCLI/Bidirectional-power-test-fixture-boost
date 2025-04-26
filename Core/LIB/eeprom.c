@@ -2,8 +2,8 @@
  * Code version: 1.0
  * ad24c02文件管理
  * 24c02地址格式：
- * 32页(PageAddr:0-15)
- *   |___8字节(BitAddr:0-15)
+ * 32页(PageAddr:0-31)
+ *   |___8字节(ByteAddr:0-7)
  * 设备地址
  * +-----+---+---+---+---+---+---+---+-----+
  * | bit | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7   |
@@ -16,7 +16,7 @@
  * +-----+-------+-------+-------+-------+-------+----------+----------+----------+
  * | bit | 0     | 1     | 2     | 3     | 4     | 5        | 6        | 7        |
  * +-----+-------+-------+-------+-------+-------+----------+----------+----------+
- * |     | Page1 | Page2 | Page3 | Page4 | page5 | BitAddr1 | BitAddr2 | BitAddr3 |
+ * |     | Page1 | Page2 | Page3 | Page4 | page5 | ByteAddr1| ByteAddr2| ByteAddr3|
  * +-----+-------+-------+-------+-------+-------+----------+----------+----------+
  * 
  * 数据帧格式
@@ -53,44 +53,44 @@ void at24_EraseMemFull()
 
 //字节写
 void at24_BitWrite(I2C_HandleTypeDef* I2cHandle,uint8_t PageAddr,
-                   uint8_t BitAddr,uint8_t* RxData)
+                   uint8_t ByteAddr,uint8_t* RxData)
 {
     HAL_I2C_Mem_Write(I2cHandle,AT24BaseAddr,
-                      (PageAddr<<3)|BitAddr,1,RxData,1,0xFF);
+                      (PageAddr<<3)|ByteAddr,1,RxData,1,0xFF);
 }
 
 //按页写
 void at24_PageWrite(I2C_HandleTypeDef* I2cHandle,
-                    uint8_t PageAddr,uint8_t BitAddr,uint16_t DataLength,
+                    uint8_t PageAddr,uint8_t ByteAddr,uint16_t DataLength,
                     uint8_t* RxData)
 {
-    if((BitAddr+DataLength) > 8)   {return;}
+    if((ByteAddr+DataLength) > 8)   {return;}
     HAL_I2C_Mem_Write(I2cHandle,AT24BaseAddr,
-                      (PageAddr<<3)|BitAddr,1,RxData,DataLength,0xFF);
+                      (PageAddr<<3)|ByteAddr,1,RxData,DataLength,0xFF);
 }
 
 //任意地址，任意长度按页写
 void at24_RandomWrite(I2C_HandleTypeDef* I2cHandle,
-                      uint8_t PageAddr,uint8_t BitAddr,uint16_t DataLength,
+                      uint8_t PageAddr,uint8_t ByteAddr,uint16_t DataLength,
                       uint8_t* RxData)
 {
-    if((BitAddr+DataLength) <= 8){//数据未超过一页
+    if((ByteAddr+DataLength) <= 8){//数据未超过一页
         at24_PageWrite(I2cHandle,PageAddr,
-                       BitAddr,DataLength,RxData);
+                       ByteAddr,DataLength,RxData);
     }else{//数据超过一页
-        uint8_t BitAddrOffset = 8 - BitAddr;
-        uint8_t PageNum = (DataLength + BitAddr)>>3;
+        uint8_t ByteAddrOffset = 8 - ByteAddr;
+        uint8_t PageNum = (DataLength + ByteAddr)>>3;
         at24_PageWrite(I2cHandle,PageAddr,
-                       BitAddr,BitAddrOffset,RxData);//第一页
+                       ByteAddr,ByteAddrOffset,RxData);//第一页
         HAL_Delay(2);//给上面的操作延时，让EEPROM写入完成
         for(uint8_t i = 0;i < PageNum;i++){
             if(i == (PageNum-1)){//最后一页
                 at24_PageWrite(I2cHandle,PageAddr+1+(i%8),
-                               0x00,((BitAddr+DataLength)%8),RxData+BitAddrOffset+i*8);//最后一页
+                               0x00,((ByteAddr+DataLength)%8),RxData+ByteAddrOffset+i*8);//最后一页
                 HAL_Delay(2);
             }else{//中间的页
                 at24_PageWrite(I2cHandle,PageAddr+1+(i%8),
-                               0x00,8,RxData+BitAddrOffset+i*8);
+                               0x00,8,RxData+ByteAddrOffset+i*8);
                 HAL_Delay(2);
             }
         }
@@ -98,9 +98,9 @@ void at24_RandomWrite(I2C_HandleTypeDef* I2cHandle,
 }
 //任意地址，任意长度读
 void at24_RandomRead(I2C_HandleTypeDef* I2cHandle,
-                     uint8_t PageAddr,uint8_t BitAddr,uint16_t DataLength,uint8_t* RxData)
+                     uint8_t PageAddr,uint8_t ByteAddr,uint16_t DataLength,uint8_t* RxData)
 {
-    HAL_I2C_Mem_Read(I2cHandle,AT24BaseAddr+1,(PageAddr<<3)|BitAddr,
+    HAL_I2C_Mem_Read(I2cHandle,AT24BaseAddr+1,(PageAddr<<3)|ByteAddr,
                      1,RxData,DataLength,0xFF);
 }
 
@@ -136,18 +136,18 @@ void charTOuint16(uint8_t* buf,uint16_t* data)
 
 
 void at24_HAL_write(I2C_HandleTypeDef* I2cHandle,
-                    uint8_t PageAddr,uint8_t BitAddr,uint16_t DataLength,uint8_t* RxData)
+                    uint8_t PageAddr,uint8_t ByteAddr,uint16_t DataLength,uint8_t* RxData)
 {
     if(DataLength == 1){
-        at24_BitWrite(I2cHandle,PageAddr,BitAddr,RxData);
+        at24_BitWrite(I2cHandle,PageAddr,ByteAddr,RxData);
         HAL_Delay(2);
     }else{
-        at24_RandomWrite(I2cHandle,PageAddr,BitAddr,DataLength,RxData);
+        at24_RandomWrite(I2cHandle,PageAddr,ByteAddr,DataLength,RxData);
     }
 }
 
 void at24_HAL_read(I2C_HandleTypeDef* I2cHandle,
-                   uint8_t PageAddr,uint8_t BitAddr,uint16_t DataLength,uint8_t* RxData)
+                   uint8_t PageAddr,uint8_t ByteAddr,uint16_t DataLength,uint8_t* RxData)
 {
-    at24_RandomRead(I2cHandle,PageAddr,BitAddr,DataLength,RxData);
+    at24_RandomRead(I2cHandle,PageAddr,ByteAddr,DataLength,RxData);
 }

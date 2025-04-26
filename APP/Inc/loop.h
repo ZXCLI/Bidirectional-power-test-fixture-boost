@@ -58,6 +58,17 @@ typedef struct
     uint16_t system_status;
 }Device;
 
+// eeprom异步写入的数据队列
+typedef struct
+{
+    uint8_t len;
+    uint8_t index;
+    uint8_t data[32];   // 一个float占4个字节，一个uint16_t占2个字节，一个uint8_t占1个字节
+    uint8_t offset;     // 已写入的数据偏移量（避免内存拷贝）
+    uint8_t PageAddr;
+    uint8_t ByteAddr;
+}dataQueue;
+
 extern Device device;
 
 void MY_Init();
@@ -69,6 +80,6 @@ void fanPWMInit();
 float Slew_Func(float *slewVal, float refVal, float slewRate);
 void updateDAC();
 int limiteCurrent();
-
+void eepromWrite(uint16_t len, uint8_t *data, uint8_t PageAddr, uint8_t ByteAddr);
 
 #endif /* _LOOP_H */
