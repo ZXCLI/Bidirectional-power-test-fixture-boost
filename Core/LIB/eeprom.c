@@ -64,7 +64,7 @@ void at24_PageWrite(I2C_HandleTypeDef* I2cHandle,
                     uint8_t PageAddr,uint8_t ByteAddr,uint16_t DataLength,
                     uint8_t* RxData)
 {
-    if((ByteAddr+DataLength) > 8)   {return;}
+    if((ByteAddr+DataLength) > ONE_PAGE_BYTE)   {return;}
     HAL_I2C_Mem_Write(I2cHandle,AT24BaseAddr,
                       (PageAddr<<3)|ByteAddr,1,RxData,DataLength,0xFF);
 }
@@ -74,23 +74,23 @@ void at24_RandomWrite(I2C_HandleTypeDef* I2cHandle,
                       uint8_t PageAddr,uint8_t ByteAddr,uint16_t DataLength,
                       uint8_t* RxData)
 {
-    if((ByteAddr+DataLength) <= 8){//数据未超过一页
+    if((ByteAddr+DataLength) <= ONE_PAGE_BYTE){//数据未超过一页
         at24_PageWrite(I2cHandle,PageAddr,
                        ByteAddr,DataLength,RxData);
     }else{//数据超过一页
-        uint8_t ByteAddrOffset = 8 - ByteAddr;
+        uint8_t ByteAddrOffset = ONE_PAGE_BYTE - ByteAddr;
         uint8_t PageNum = (DataLength + ByteAddr)>>3;
         at24_PageWrite(I2cHandle,PageAddr,
                        ByteAddr,ByteAddrOffset,RxData);//第一页
         HAL_Delay(2);//给上面的操作延时，让EEPROM写入完成
         for(uint8_t i = 0;i < PageNum;i++){
             if(i == (PageNum-1)){//最后一页
-                at24_PageWrite(I2cHandle,PageAddr+1+(i%8),
-                               0x00,((ByteAddr+DataLength)%8),RxData+ByteAddrOffset+i*8);//最后一页
+                at24_PageWrite(I2cHandle,PageAddr+1+(i%ONE_PAGE_BYTE),
+                               0x00,((ByteAddr+DataLength)%ONE_PAGE_BYTE),RxData+ByteAddrOffset+i*ONE_PAGE_BYTE);//最后一页
                 HAL_Delay(2);
             }else{//中间的页
-                at24_PageWrite(I2cHandle,PageAddr+1+(i%8),
-                               0x00,8,RxData+ByteAddrOffset+i*8);
+                at24_PageWrite(I2cHandle,PageAddr+1+(i%ONE_PAGE_BYTE),
+                               0x00,ONE_PAGE_BYTE,RxData+ByteAddrOffset+i*ONE_PAGE_BYTE);
                 HAL_Delay(2);
             }
         }

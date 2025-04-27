@@ -2,6 +2,7 @@
 #include "loop.h"
 #include "least_squares.h"
 #include "shell_port.h"
+#include "data_management.h"
 
 bool A_Task_Flag = false;      // A分支任务标志
 bool B_Task_Flag = false;      // B分支任务标志
@@ -91,10 +92,12 @@ void B1(void)
     // Toggle the LED
     static uint16_t Vtimer_B1 = 0;
     Vtimer_B1++;
-    if (Vtimer_B1 >= device.Vtimer_B_CCR) {
+    if (Vtimer_B1 >= device.Vtimer_B_ARR) {
         Vtimer_B1 = 0;
         HAL_GPIO_TogglePin(TEST1_GPIO_Port, TEST1_Pin);
     }
+
+    eepromWrite(0x00,NULL,0x00,0x00);
 
     B_Task_Ptr = &B1;
 }

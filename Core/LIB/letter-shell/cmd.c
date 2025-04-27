@@ -1,10 +1,13 @@
 #include "shell.h"
+#include "cmd.h"
 #include "loop.h"
 #include "spi.h"
 #include "dac8552.h"
 #include "shell_port.h"
-#include "stdio.h"
 #include "least_squares.h"
+#include "eeprom.h"
+#include "string.h"
+#include "data_management.h"
 
 //这个文件用于注册shell命令
 
@@ -386,4 +389,91 @@ void sendVoltage(void)
 SHELL_EXPORT_CMD(   
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
     sendVoltage, sendVoltage, "sendVoltage"
+);
+
+int writeDacConverData(char *ChannelType, float a0, float a1)
+{
+    uint8_t temp_a0[4];
+    uint8_t temp_a1[4];
+
+    if (strcmp(ChannelType,"V_IN") == 0)
+    {    
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, VIN_OFFSET/ONE_PAGE_BYTE,0x00);
+        eepromWrite(0x04, temp_a1, VIN_OFFSET/ONE_PAGE_BYTE,ONE_FLOAT_BYTE);
+        return 1;
+    }else if (strcmp(ChannelType,"I_IN") == 0)
+    {
+        uint16_t test = (IIN_OFFSET/ONE_PAGE_BYTE);
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, (IIN_OFFSET/ONE_PAGE_BYTE),0x00);
+        eepromWrite(0x04, temp_a1, (IIN_OFFSET/ONE_PAGE_BYTE),ONE_FLOAT_BYTE);
+        return 3;
+    }else if ( strcmp(ChannelType,"V_OUT") == 0)
+    {
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, VOUT_OFFSET/ONE_PAGE_BYTE,0x00);
+        eepromWrite(0x04, temp_a1, VOUT_OFFSET/ONE_PAGE_BYTE,ONE_FLOAT_BYTE);
+        return 2;
+    }else if ( strcmp(ChannelType,"I_OUT") == 0)
+    {
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, IOUT_OFFSET/ONE_PAGE_BYTE,0x00);
+        eepromWrite(0x04, temp_a1, IOUT_OFFSET/ONE_PAGE_BYTE,ONE_FLOAT_BYTE);
+        return 4;
+    }else{
+        return -1;
+    }
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    writeDacConverData, writeDacConverData, "writeDacConverData ChannelType DataType data"
+);
+
+int writeAdcConverData(char *ChannelType, float a0, float a1)
+{
+    uint8_t temp_a0[4];
+    uint8_t temp_a1[4];
+
+    if (strcmp(ChannelType,"V_IN") == 0)
+    {
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, (VIN_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,0x00);
+        eepromWrite(0x04, temp_a1, (VIN_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,ONE_FLOAT_BYTE);
+        return 1;
+    }else if (strcmp(ChannelType,"I_IN") == 0)
+    {
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, (IIN_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,0x00);
+        eepromWrite(0x04, temp_a1, (IIN_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,ONE_FLOAT_BYTE);
+        return 3;
+    }else if ( strcmp(ChannelType,"V_OUT") == 0)
+    {
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, (VOUT_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,0x00);
+        eepromWrite(0x04, temp_a1, (VOUT_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,ONE_FLOAT_BYTE);
+        return 2;
+    }else if ( strcmp(ChannelType,"I_OUT") == 0)
+    {
+        floatTO4char(a0,temp_a0);
+        floatTO4char(a1,temp_a1);
+        eepromWrite(0x04, temp_a0, (IOUT_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,0x00);
+        eepromWrite(0x04, temp_a1, (IOUT_OFFSET+ADC_CONVER_OFFSET)/ONE_PAGE_BYTE,ONE_FLOAT_BYTE);
+        return 4;
+    }else{
+        return -1;
+    }
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    writeAdcConverData, writeAdcConverData, "writeAdcConverData ChannelType DataType data"
 );
