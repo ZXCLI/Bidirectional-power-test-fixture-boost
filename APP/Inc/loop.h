@@ -22,6 +22,16 @@
 
 typedef enum
 {
+    RUN = 1,
+    CALIBRATION,
+    STANDBY,
+    ERROR_OVERVOLTAGE,
+    ERROR_OVERCURRENT,
+    ERROR_OVERTEMPERATURE,
+}SYSTEM_STATUS;
+
+typedef enum
+{
     V_IN = 0,
     V_OUT,
     I_IN,
@@ -56,7 +66,7 @@ typedef struct
     uint16_t phase;   // 运行的相数
     uint8_t Vtimer_A_ARR;
     uint8_t Vtimer_B_ARR;
-    uint16_t system_status;
+    SYSTEM_STATUS system_status;
 }Device;
 
 extern Device device;

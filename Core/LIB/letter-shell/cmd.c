@@ -90,6 +90,7 @@ int16_t SetClockPhases(uint8_t phases)
                 LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH4);
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                device.system_status = STANDBY; // 系统状态设为待机
                 break;
             case (3|(6<<3))://三相转六相
                 HAL_GPIO_WritePin(UVLO2_GPIO_Port,UVLO2_Pin,RunNormal);
@@ -117,6 +118,7 @@ int16_t SetClockPhases(uint8_t phases)
                 LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH3);
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                device.system_status = STANDBY; // 系统状态设为待机
                 break;
             case (2|(6<<3))://两相转六相
                 HAL_GPIO_WritePin(UVLO2_GPIO_Port,UVLO2_Pin,RunNormal);
@@ -143,6 +145,7 @@ int16_t SetClockPhases(uint8_t phases)
                 HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,StandBy);
                 LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_DisableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                device.system_status = STANDBY; // 系统状态设为待机
                 break;
             case (1|(6<<3))://一相转六相
                 HAL_GPIO_WritePin(UVLO2_GPIO_Port,UVLO2_Pin,RunNormal);
@@ -171,6 +174,7 @@ int16_t SetClockPhases(uint8_t phases)
             case (1|(0<<3))://一相转零相
                 HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,StandBy);
                 LL_TIM_CC_DisableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+                device.system_status = STANDBY; // 系统状态设为待机
                 break;
             case (0|(6<<3))://零相转六相
                 HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
@@ -186,6 +190,7 @@ int16_t SetClockPhases(uint8_t phases)
                 LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
                 TIM1->CCR3 = six_phase[2];
+                device.system_status = RUN; // 系统状态设为运行
                 break;
             case (0|(3<<3))://零相转三相
                 HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
@@ -195,16 +200,19 @@ int16_t SetClockPhases(uint8_t phases)
                 LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH3);
                 LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
                 TIM1->CCR3 = three_phase[1];
+                device.system_status = RUN; // 系统状态设为运行
                 break;
             case (0|(2<<3))://零相转两相
                 HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
                 HAL_GPIO_WritePin(UVLO6_GPIO_Port,UVLO6_Pin,RunNormal);
                 LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
                 LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH2);
+                device.system_status = RUN; // 系统状态设为运行
                 break;
             case (0|(1<<3))://零相转一相
                 HAL_GPIO_WritePin(UVLO1_GPIO_Port,UVLO1_Pin,RunNormal);
                 LL_TIM_CC_EnableChannel(TIM1, LL_TIM_CHANNEL_CH1);
+                device.system_status = RUN; // 系统状态设为运行
                 break;
             default:
                 break;
@@ -278,9 +286,10 @@ SHELL_EXPORT_CMD(
     setIutputCurrent, setIutputCurrent, "SetOutputCurrent"
 );
 
-// 在运行下面的校准命令前，请先运行StartCalibration命令
+// 在运行下面的校准DAC的参数命令前，请先运行StartCalibration命令。校准ADC的时候不用。
 void StartCalibration(void)
 {
+    device.system_status = CALIBRATION;    // 系统状态设为校准
     DAC8552_WriteA_test(13474); // 15V
     DAC8552_WriteB_test(3942);  // 1A
 }
@@ -290,8 +299,8 @@ SHELL_EXPORT_CMD(
     StartCalibration, StartCalibration, "StartCalibration"
 );
 
-// 校准电压
-int CalibrationVoltage(float realVoltage)
+// 校准输出电压，同时校准ADC和DAC
+int CalibrationOutVoltage(float realVoltage)
 {
     static uint8_t count = 0;
     static float RealVolt[5] = {0}; //x
@@ -299,12 +308,12 @@ int CalibrationVoltage(float realVoltage)
 
     float DAC_input[5] = {13474.0f,17969.0f,22462.0f,26954.0f,31447.0f};//15V,20V,25V,30V,35V,y
    
-    RealVolt[count] = realVoltage;
+    RealVolt[count] = realVoltage;  // 先存进去，count再加1
     ADC_date[count] = (float)(device.adc_value[V_OUT]);
     count++;
     
-    if(count == 5)
-    {
+    if(count == 5){
+        device.system_status = RUN;    // 系统状态设为运行
         count = 0;
         LinearFitResult result_voltTOdac;
         LinearFitResult result_adcTOvolt;
@@ -312,9 +321,13 @@ int CalibrationVoltage(float realVoltage)
             (Linear_LeastSquares_Fit(ADC_date,RealVolt,5,&result_adcTOvolt) == LS_OK)){
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
             SEGGER_RTT_printf(0,"Voltage to DAC a1:%f,a0:%f,r:%f\n\r",
-                                result_voltTOdac.slope,result_voltTOdac.intercept,result_voltTOdac.r_squared);
-            SEGGER_RTT_printf(0,"ADC to Voltage (x1000) a1:%f,(x1000) a0:%f,r:%f\n\r",
-                                result_adcTOvolt.slope*1000.0f,result_adcTOvolt.intercept*1000.0f,result_adcTOvolt.r_squared);
+                                result_voltTOdac.slope,
+                                result_voltTOdac.intercept,
+                                result_voltTOdac.r_squared);
+            SEGGER_RTT_printf(0,"ADC to V_OUT (x1000) a1:%f,(x1000) a0:%f,r:%f\n\r",
+                                result_adcTOvolt.slope*1000.0f,
+                                result_adcTOvolt.intercept*1000.0f,
+                                result_adcTOvolt.r_squared);
             return 0; 
         }else{
             SEGGER_RTT_printf(0,"Linear_LeastSquares_Fit error\n\r");
@@ -328,14 +341,14 @@ int CalibrationVoltage(float realVoltage)
 
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
-    CalibrationVoltage, CalibrationVoltage, "CalibrationVoltage realVoltage"
+    CalibrationOutVoltage, CalibrationOutVoltage, "CalibrationVoltage realVoltage"
 );
 
 // 校准电流
-int CalibrationCurrent(float realCurrent)
+int CalibrationInCurrent(float realCurrent)
 {
     static uint8_t count     = 0;
-    static float RealCur[5] = {0}; // x
+    static float RealCur[5] = {0};  // x
     static float ADC_date[5] = {0}; // x
 
     float DAC_input[5] = {3942.0f, 4430.0f, 5400.0f, 6370.0f, 7340.0f}; // 1A,2A,4A,6A,8A,y
@@ -345,6 +358,7 @@ int CalibrationCurrent(float realCurrent)
     count++;
 
     if (count == 5) {
+        device.system_status = RUN; // 系统状态设为运行
         count = 0;
         LinearFitResult result_curTOdac;
         LinearFitResult result_adcTOcur;
@@ -352,9 +366,13 @@ int CalibrationCurrent(float realCurrent)
             (Linear_LeastSquares_Fit(ADC_date, RealCur, 5, &result_adcTOcur) == LS_OK)) {
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
             SEGGER_RTT_printf(0, "Current to DAC a1:%f,a0:%f,r:%f\n\r", 
-                                 result_curTOdac.slope, result_curTOdac.intercept, result_curTOdac.r_squared);
-            SEGGER_RTT_printf(0, "ADC to Current (x1000) a1:%f,(x1000) a0:%f,r:%f\n\r",
-                                 result_adcTOcur.slope*1000.0f, result_adcTOcur.intercept*1000.0f, result_adcTOcur.r_squared);
+                                 result_curTOdac.slope, 
+                                 result_curTOdac.intercept, 
+                                 result_curTOdac.r_squared);
+            SEGGER_RTT_printf(0, "ADC to I_IN (x1000) a1:%f,(x1000) a0:%f,r:%f\n\r",
+                                 result_adcTOcur.slope*1000.0f, 
+                                 result_adcTOcur.intercept*1000.0f, 
+                                 result_adcTOcur.r_squared);
             return 0;
         } else {
             SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit error\n\r");
@@ -368,7 +386,81 @@ int CalibrationCurrent(float realCurrent)
 
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
-    CalibrationCurrent, CalibrationCurrent, "CalibrationCurrent realCurrent"
+    CalibrationInCurrent, CalibrationInCurrent, "CalibrationCurrent realCurrent"
+);
+
+int CalibrationInVoltage(float realVoltage)
+{
+    static uint8_t count = 0;
+    static float RealVolt[6] = {0}; // y
+    static float ADC_date[6] = {0}; // x
+
+    if (count == 5) {
+        count = 0;
+        LinearFitResult result_adcTOvolt;
+        if (Linear_LeastSquares_Fit(ADC_date, RealVolt, 5, &result_adcTOvolt) == LS_OK) {
+            SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
+            SEGGER_RTT_printf(0, "ADC to V_IN (x1000) a1:%f,a0:%f,r:%f\n\r",
+                              result_adcTOvolt.slope * 1000.0f,
+                              result_adcTOvolt.intercept * 1000.0f,
+                              result_adcTOvolt.r_squared);
+            return 0;
+        } else {
+            SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit error\n\r");
+            return -1;
+        }
+    }
+
+    RealVolt[count] = realVoltage;
+    ADC_date[count] = (float)(device.adc_value[V_IN]);
+    SEGGER_RTT_printf(0, "%d\r\n", device.adc_value[V_IN]);
+    // ADC_date[0] = 1;
+    // ADC_date[1] = 2;
+    // ADC_date[2] = 3;
+    // ADC_date[3] = 4;
+    // ADC_date[4] = 5;
+
+    count++;
+    return count;
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    CalibrationInVoltage, CalibrationInVoltage, "CalibrationVoltage realVoltage"
+);
+
+int CalibrationOutCurrent(float realCurrent)
+{
+    static uint8_t count = 0;
+    static float RealCur[6] = {0}; // y
+    static float ADC_date[6] = {0}; // x
+
+    if (count == 5) {
+        count = 0;
+        LinearFitResult result_adcTOcur;
+        if (Linear_LeastSquares_Fit(ADC_date, RealCur, 5, &result_adcTOcur) == LS_OK) {
+            SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit OK\n\r");
+            SEGGER_RTT_printf(0, "ADC to I_OUT (x1000) a1:%f,a0:%f,r:%f\n\r",
+                              result_adcTOcur.slope * 1000.0f,
+                              result_adcTOcur.intercept * 1000.0f,
+                              result_adcTOcur.r_squared);
+            return 0;
+        } else {
+            SEGGER_RTT_printf(0, "Linear_LeastSquares_Fit error\n\r");
+            return -1;
+        }
+    }
+
+    RealCur[count] = realCurrent;
+    ADC_date[count] = (float)(device.adc_value[I_OUT]);
+
+    count++;
+    return count;
+}
+
+SHELL_EXPORT_CMD(
+    SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+    CalibrationOutCurrent, CalibrationOutCurrent, "CalibrationCurrent realCurrent"
 );
 
 void sendCruent(void)
@@ -405,7 +497,6 @@ int writeDacConverData(char *ChannelType, float a0, float a1)
         return 1;
     }else if (strcmp(ChannelType,"I_IN") == 0)
     {
-        uint16_t test = (IIN_OFFSET/ONE_PAGE_BYTE);
         floatTO4char(a0,temp_a0);
         floatTO4char(a1,temp_a1);
         eepromWrite(0x04, temp_a0, (IIN_OFFSET/ONE_PAGE_BYTE),0x00);
@@ -432,7 +523,7 @@ int writeDacConverData(char *ChannelType, float a0, float a1)
 
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
-    writeDacConverData, writeDacConverData, "writeDacConverData ChannelType DataType data"
+    writeDacConverData, writeDacConverData, "writeDacConverData "Channel" a0 a1"
 );
 
 int writeAdcConverData(char *ChannelType, float a0, float a1)
@@ -475,5 +566,5 @@ int writeAdcConverData(char *ChannelType, float a0, float a1)
 
 SHELL_EXPORT_CMD(
     SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
-    writeAdcConverData, writeAdcConverData, "writeAdcConverData ChannelType DataType data"
+    writeAdcConverData, writeAdcConverData, "writeAdcConverData "Channel" a0 a1"
 );

@@ -24,7 +24,7 @@ ADS1220_regs ADS1220_default_regs = {
 
 void MY_Init(void)
 {
-
+    device.system_status = STANDBY; // 初始化系统状态
     delay_init();
 
     SEGGER_RTT_Init();
@@ -50,28 +50,27 @@ void MY_Init(void)
 
     rttShellInit(); // 初始化RTT Shell
 
-    converDataInit();
-
     // device.DACdataConver[V_OUT].a1 = 902.119202f;
     // device.DACdataConver[V_OUT].a0 = -143.923431f;
     // device.DACdataConver[I_IN].a1  = 485.702087f;
     // device.DACdataConver[I_IN].a0  = 3586.960938f;
 
     // device.ADCdataConver[V_OUT].a1 = 0.008689f/1000.0f;
-    // device.ADCdataConver[V_OUT].a0 = 11.676025f/1000.0f;
-
-    // SetVoltageOrCurrent(VOLTAGE,14.0f); // 直接设置输出电压
-    // SetVoltageOrCurrent(CURRENT,0.1f);  // 直接设置输入电流
-    // device.DAC_voltage_ref = 15.0f;
-    // device.DAC_current_ref = 0.6f;
-
-    DAC8552_WriteA(&hspi1,0.512f);  // 15.0V
-    DAC8552_WriteB(&hspi1,0.14f); // 0.5A
-
-    SetVoltageOrCurrent(VOLTAGE,15.0f); // 直接设置输出电压
-    SetVoltageOrCurrent(CURRENT,1.0f);  // 直接设置输入电流
+    // device.ADCdataConver[V_OUT].a0 = 11.676025f/1000.0f;    
 
     HAL_Delay(100);
+
+    converDataInit();
+    // 不多发几遍DAC有概率会不工作，很奇怪
+    DAC8552_WriteA(&hspi1, 0.512f); // 15.0V
+    DAC8552_WriteB(&hspi1, 0.14f);  // 0.5A
+    DAC8552_WriteA(&hspi1, 0.512f); // 15.0V
+    DAC8552_WriteB(&hspi1, 0.14f);  // 0.5A
+    DAC8552_WriteA(&hspi1, 0.512f); // 15.0V
+    DAC8552_WriteB(&hspi1, 0.14f);  // 0.5A
+
+    // SetVoltageOrCurrent(VOLTAGE, 15.0f); // 直接设置输出电压
+    // SetVoltageOrCurrent(CURRENT, 1.0f);  // 直接设置输入电流
 
     Alpha_State_Ptr = &A0; // 初始化状态机
     A_Task_Ptr = &A1;
@@ -110,7 +109,8 @@ void converDataInit()
                 charTOfloat(&read[i*2*ONE_FLOAT_BYTE + ADC_CONVER_OFFSET], 
                             &(device.ADCdataConver[i].a0));
             }else{      //a1
-                charTOfloat(&read[i*2*ONE_FLOAT_BYTE + ONE_FLOAT_BYTE + ADC_CONVER_OFFSET], 
+                charTOfloat(&read[i*2*ONE_FLOAT_BYTE + ONE_FLOAT_BYTE + \
+                                    ADC_CONVER_OFFSET], 
                             &(device.ADCdataConver[i].a1));
             }
         }
@@ -177,12 +177,13 @@ float Slew_Func(float *slewVal, float refVal, float slewRate)
 // 通过斜坡函数更新DAC输出
 void updateDAC()
 {
-    Slew_Func(&device.DAC_voltage_now, device.DAC_voltage_ref, 0.05f);
-    SetVoltageOrCurrent(VOLTAGE,device.DAC_voltage_now);
-    
-    Slew_Func(&device.DAC_current_now, device.DAC_current_ref, 0.05f);
-    SetVoltageOrCurrent(CURRENT,device.DAC_current_now);
-    
+    if(device.system_status == RUN){
+        Slew_Func(&device.DAC_voltage_now, device.DAC_voltage_ref, 0.05f);
+        SetVoltageOrCurrent(VOLTAGE,device.DAC_voltage_now);
+        
+        Slew_Func(&device.DAC_current_now, device.DAC_current_ref, 0.05f);
+        SetVoltageOrCurrent(CURRENT,device.DAC_current_now);
+    }
 }
 
 int limiteCurrent(void)

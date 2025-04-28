@@ -72,7 +72,7 @@ void B1(void)
 
     ADS1220_select_mux_config(&hspi2, ADS1220_MUX_AIN0_AVSS + ADC_CHANNEL * 16,
                               &ADS1220_default_regs);
-    ADS1220_start_conversion(&hspi2);   
+    ADS1220_start_conversion(&hspi2);
     // 触发本轮的ADC转换，经过状态机切换的延时，ADC转换完成，在下一轮开头读取数据
 
     device.V_OUT = device.adc_value[V_OUT] * device.ADCdataConver[V_OUT].a1 
@@ -97,7 +97,7 @@ void B1(void)
         HAL_GPIO_TogglePin(TEST1_GPIO_Port, TEST1_Pin);
     }
 
-    eepromWrite(0x00,NULL,0x00,0x00);
+    eepromWrite(0x00,NULL,0x00,0x00);   // 异步按页写入EEPROM
 
     B_Task_Ptr = &B1;
 }
