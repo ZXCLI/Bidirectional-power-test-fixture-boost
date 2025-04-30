@@ -50,6 +50,8 @@ void MY_Init(void)
 
     rttShellInit(); // 初始化RTT Shell
 
+    converDataInit();
+
     // device.DACdataConver[V_OUT].a1 = 902.119202f;
     // device.DACdataConver[V_OUT].a0 = -143.923431f;
     // device.DACdataConver[I_IN].a1  = 485.702087f;
@@ -60,15 +62,9 @@ void MY_Init(void)
 
     HAL_Delay(100);
 
-    converDataInit();
     // 不多发几遍DAC有概率会不工作，很奇怪
     DAC8552_WriteA(&hspi1, 0.512f); // 15.0V
     DAC8552_WriteB(&hspi1, 0.14f);  // 0.5A
-    DAC8552_WriteA(&hspi1, 0.512f); // 15.0V
-    DAC8552_WriteB(&hspi1, 0.14f);  // 0.5A
-    DAC8552_WriteA(&hspi1, 0.512f); // 15.0V
-    DAC8552_WriteB(&hspi1, 0.14f);  // 0.5A
-
     // SetVoltageOrCurrent(VOLTAGE, 15.0f); // 直接设置输出电压
     // SetVoltageOrCurrent(CURRENT, 1.0f);  // 直接设置输入电流
 

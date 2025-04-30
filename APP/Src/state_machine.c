@@ -84,10 +84,14 @@ void B1(void)
     device.I_IN = device.adc_value[I_IN] * device.ADCdataConver[I_IN].a1
                     + device.ADCdataConver[I_IN].a0;
     
-    SEGGER_RTT_printf(1, "%d,%d,%d,%d\n\r", device.adc_value[V_IN],
-                                            device.adc_value[V_OUT],
-                                            device.adc_value[I_IN],
-                                            device.adc_value[I_OUT]);
+    // SEGGER_RTT_printf(1, "%d,%d,%d,%d\n\r", device.adc_value[V_IN],
+    //                                         device.adc_value[V_OUT],
+    //                                         device.adc_value[I_IN],
+    //                                         device.adc_value[I_OUT]);
+    SEGGER_RTT_printf(1, "%f,%f,%f,%f\n\r", device.V_IN,
+                                            device.V_OUT,
+                                            device.I_IN,
+                                            device.I_OUT);
     
     // Toggle the LED
     static uint16_t Vtimer_B1 = 0;
